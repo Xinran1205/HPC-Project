@@ -4,12 +4,13 @@
 #include <random>
 #include <execution>
 #include <algorithm>
+#include <mutex>
 
-// Block matrix multiplication
 
 std::vector<std::vector<float>> IJK_matrixMultiply(const std::vector<std::vector<float>>& mat1, const std::vector<std::vector<float>>& mat2);
 std::vector<std::vector<float>> parallelMatrixMultiply(const std::vector<std::vector<float>>& mat1, const std::vector<std::vector<float>>& mat2);
 std::vector<std::vector<float>> Block_matrixMultiply(const std::vector<std::vector<float>>& mat1, const std::vector<std::vector<float>>& mat2, int blockSize);
+// error
 std::vector<std::vector<float>> Parallel_Block_matrixMultiply(const std::vector<std::vector<float>>& mat1, const std::vector<std::vector<float>>& mat2, int blockSize);
 
 
@@ -43,8 +44,12 @@ std::vector<std::vector<float>> parallelMatrixMultiply(const std::vector<std::ve
     //initialize the product matrix with 0
     std::vector<std::vector<float>> product(rows1, std::vector<float>(cols2, 0.0f));
 
-    std::for_each(std::execution::par, product.begin(), product.end(), [&](auto& row) {
-        auto i = &row - &product[0];
+    std::vector<int> index(rows1);
+    std::iota(index.begin(), index.end(), 0);
+
+    // row is from product.begin() to product.end()
+    // optimized from & to cols1, cols2, &mat1, &mat2, &product
+    std::for_each(std::execution::par, index.begin(), index.end(), [cols1, cols2, &mat1, &mat2, &product](int i) {
         for (int j = 0; j < cols2; ++j) {
             for (int k = 0; k < cols1; ++k) {
                 product[i][j] += mat1[i][k] * mat2[k][j];
@@ -95,19 +100,19 @@ std::vector<std::vector<float>> Parallel_Block_matrixMultiply(const std::vector<
 
     int rows1 = mat1.size(), cols1 = mat1[0].size(), cols2 = mat2[0].size();
     std::vector<std::vector<float>> product(rows1, std::vector<float>(cols2, 0.0f));
+    std::vector<int> index(rows1);
+    std::iota(index.begin(), index.end(), 0);
 
     // Perform block matrix multiplication in parallel for each block
-    std::for_each(std::execution::par, product.begin(), product.end(), [&](auto& row) {
-        int i = &row - &product[0]; // Compute the current row index
+    std::for_each(std::execution::par, index.begin(), index.end(), [&](int i) {
         for (int jj = 0; jj < cols2; jj += blockSize) {
             for (int kk = 0; kk < cols1; kk += blockSize) {
                 for (int ii = i; ii < std::min(i + blockSize, rows1); ++ii) {
                     for (int j = jj; j < std::min(jj + blockSize, cols2); ++j) {
-                        float sum = 0.0f;
                         for (int k = kk; k < std::min(kk + blockSize, cols1); ++k) {
-                            sum += mat1[ii][k] * mat2[k][j];
+                            // lock?
+                            product[i][j] += mat1[i][k] * mat2[k][j];
                         }
-                        product[ii][j] += sum;
                     }
                 }
             }
@@ -116,6 +121,7 @@ std::vector<std::vector<float>> Parallel_Block_matrixMultiply(const std::vector<
 
     return product;
 }
+
 
 
 // Execute matrix multiplication and measure time and GFLOPS
@@ -165,8 +171,8 @@ int main() {
         auto ijkProduct = IJK_matrixMultiply(mat1, mat2);
         auto parallelProduct = parallelMatrixMultiply(mat1, mat2);
         auto blockProduct = Block_matrixMultiply(mat1, mat2, blockSize);
-//        auto blockProduct = Parallel_Block_matrixMultiply(mat1, mat2, blockSize);
-        if (ijkProduct != parallelProduct || ijkProduct != blockProduct) {
+        auto paraBlockProduct = Parallel_Block_matrixMultiply(mat1, mat2, blockSize);
+        if (ijkProduct != parallelProduct || ijkProduct != blockProduct || ijkProduct != paraBlockProduct) {
             std::cerr << "Block matrix multiplication is incorrect!" << std::endl;
         }else{
             std::cout << "correct!" << std::endl;
