@@ -104,7 +104,8 @@ std::vector<std::vector<float>> Parallel_Block_matrixMultiply(const std::vector<
     std::iota(index.begin(), index.end(), 0);
 
     // Perform block matrix multiplication in parallel for each block
-    std::for_each(std::execution::par, index.begin(), index.end(), [&](int i) {
+    std::for_each(std::execution::par, index.begin(), index.end(),
+                  [rows1, cols1, blockSize, cols2, &mat1, &mat2, &product](int i) {
         for (int jj = 0; jj < cols2; jj += blockSize) {
             for (int kk = 0; kk < cols1; kk += blockSize) {
                 for (int ii = i; ii < std::min(i + blockSize, rows1); ++ii) {
@@ -157,7 +158,7 @@ std::vector<std::vector<float>> generateRandomMatrix(int n) {
 
 int main() {
     int blockSize = 64; // Define a suitable block size based on your system's cache size
-    std::vector<int> sizes = {100,13,23,17,2,5};
+    std::vector<int> sizes = {2};
     for (int n : sizes) {
         auto mat1 = generateRandomMatrix(n);
         auto mat2 = generateRandomMatrix(n);
