@@ -91,7 +91,7 @@ std::vector<std::vector<float>> Block_matrixMultiply(const std::vector<std::vect
 
 
 // Optimized Block matrix multiplication using C++17 features
-// error
+// not good, looks like each thread is doing all columns
 std::vector<std::vector<float>> Parallel_Block_matrixMultiply(const std::vector<std::vector<float>>& mat1,
                                                      const std::vector<std::vector<float>>& mat2, int blockSize) {
     if (mat1.empty() || mat2.empty() || mat1[0].size() != mat2.size()) {
@@ -100,18 +100,24 @@ std::vector<std::vector<float>> Parallel_Block_matrixMultiply(const std::vector<
 
     int rows1 = mat1.size(), cols1 = mat1[0].size(), cols2 = mat2[0].size();
     std::vector<std::vector<float>> product(rows1, std::vector<float>(cols2, 0.0f));
-    std::vector<int> index(rows1);
-    std::iota(index.begin(), index.end(), 0);
+
+    // calculate the number of blocks
+    int blockCount = (rows1 + blockSize - 1) / blockSize;
+
+    // create a vector of block start indices
+    std::vector<int> blockStartIndices(blockCount);
+    for (int i = 0; i < blockCount; ++i) {
+        blockStartIndices[i] = i * blockSize;
+    }
 
     // Perform block matrix multiplication in parallel for each block
-    std::for_each(std::execution::par, index.begin(), index.end(),
-                  [rows1, cols1, blockSize, cols2, &mat1, &mat2, &product](int i) {
+    std::for_each(std::execution::par, blockStartIndices.begin(), blockStartIndices.end(),
+                  [rows1, cols1, blockSize, cols2, &mat1, &mat2, &product](int ii) {
         for (int jj = 0; jj < cols2; jj += blockSize) {
             for (int kk = 0; kk < cols1; kk += blockSize) {
-                for (int ii = i; ii < std::min(i + blockSize, rows1); ++ii) {
+                for (int i = ii; i < std::min(ii + blockSize, rows1); ++i) {
                     for (int j = jj; j < std::min(jj + blockSize, cols2); ++j) {
                         for (int k = kk; k < std::min(kk + blockSize, cols1); ++k) {
-                            // lock?
                             product[i][j] += mat1[i][k] * mat2[k][j];
                         }
                     }
@@ -123,6 +129,45 @@ std::vector<std::vector<float>> Parallel_Block_matrixMultiply(const std::vector<
     return product;
 }
 
+
+// one thread for each block
+std::vector<std::vector<float>> Parallel_Block_matrixMultiply2(const std::vector<std::vector<float>>& mat1,
+                                                              const std::vector<std::vector<float>>& mat2, int blockSize) {
+    if (mat1.empty() || mat2.empty() || mat1[0].size() != mat2.size()) {
+        throw std::invalid_argument("Matrices cannot be multiplied due to size mismatch");
+    }
+
+    int rows1 = mat1.size(), cols1 = mat1[0].size(), cols2 = mat2[0].size();
+    std::vector<std::vector<float>> product(rows1, std::vector<float>(cols2, 0.0f));
+
+    // calculate the number of blocks in both dimensions
+    int blockRows = (rows1 + blockSize - 1) / blockSize;
+    int blockCols = (cols2 + blockSize - 1) / blockSize;
+
+    // Perform block matrix multiplication in parallel for each small block
+    // Use nested loops to generate tasks for each block
+    std::vector<std::pair<int, int>> blocks;
+    for (int i = 0; i < blockRows; ++i) {
+        for (int j = 0; j < blockCols; ++j) {
+            blocks.emplace_back(i, j);
+        }
+    }
+
+    std::for_each(std::execution::par, blocks.begin(), blocks.end(),
+                  [&](std::pair<int, int> block) {
+                      int blockRowStart = block.first * blockSize;
+                      int blockColStart = block.second * blockSize;
+                      for (int ii = blockRowStart; ii < std::min(blockRowStart + blockSize, rows1); ++ii) {
+                          for (int jj = blockColStart; jj < std::min(blockColStart + blockSize, cols2); ++jj) {
+                              for (int k = 0; k < cols1; ++k) {
+                                  product[ii][jj] += mat1[ii][k] * mat2[k][jj];
+                              }
+                          }
+                      }
+                  });
+
+    return product;
+}
 
 
 // Execute matrix multiplication and measure time and GFLOPS
@@ -158,7 +203,7 @@ std::vector<std::vector<float>> generateRandomMatrix(int n) {
 
 int main() {
     int blockSize = 64; // Define a suitable block size based on your system's cache size
-    std::vector<int> sizes = {2};
+    std::vector<int> sizes = {30,500,253,14,235,1,2,3};
     for (int n : sizes) {
         auto mat1 = generateRandomMatrix(n);
         auto mat2 = generateRandomMatrix(n);
