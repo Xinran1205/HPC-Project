@@ -4,7 +4,6 @@
 #include <random>
 #include <execution>
 #include <algorithm>
-#include <mutex>
 
 std::vector<float> IJK_matrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2);
 std::vector<float> parallelMatrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2);
@@ -142,7 +141,7 @@ std::vector<float> Parallel_Block_matrixMultiply2(const std::vector<float>& mat1
     }
 
     std::for_each(std::execution::par, blocks.begin(), blocks.end(),
-                  [&](std::pair<int, int> block) {
+                  [blockSize,rows1,cols2,cols1,&mat1,&mat2,&product](std::pair<int, int> block) {
                       int blockRowStart = block.first * blockSize;
                       int blockColStart = block.second * blockSize;
                       for (int ii = blockRowStart; ii < std::min(blockRowStart + blockSize, rows1); ++ii) {
