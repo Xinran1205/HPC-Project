@@ -130,7 +130,7 @@ void DTRSM(std::vector<float>& mat, const std::vector<float>& blockMat, int n, i
     }
 }
 
-// Correct!! PAx=b
+// Correct!! PA = LU
 bool DGETF2(std::vector<float>& mat,std::vector<int>& pMat, int n) {
     // Initialize P matrix as an identity matrix
     InitP(pMat, n);
@@ -197,7 +197,8 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength) {
 
         // Compute U12
         DTRSM(mat, blockMat, n, blockIndex, blockLength);
-        // how to compute L21
+        // compute L21
+        // L21 = A21 * U11^-1
 
 
         // update A22 here
