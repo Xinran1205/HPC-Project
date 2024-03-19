@@ -7,7 +7,7 @@
 #include <iomanip>
 
 // DGETRF:
-// for each A11 like block{
+// for each A11 block{
 //      DGETF2:{
 //          IDAMAX:
 //          DSWAP:
@@ -18,29 +18,6 @@
 //  DTRSM:
 //  DGEMM:
 // }
-
-
-// DGEMM Correct!
-std::vector<float> parallelMatrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2) {
-    if (rows1 == 0 || cols1 == 0 || rows2 == 0 || cols2 == 0 || cols1 != rows2) {
-        throw std::invalid_argument("Matrices cannot be multiplied due to size mismatch");
-    }
-
-    std::vector<float> product(rows1 * cols2, 0.0f);
-
-    std::vector<int> index(rows1);
-    std::iota(index.begin(), index.end(), 0);
-
-    std::for_each(std::execution::par, index.begin(), index.end(), [cols1, cols2, &mat1, &mat2, &product](int i) {
-        for (int j = 0; j < cols2; ++j) {
-            for (int k = 0; k < cols1; ++k) {
-                product[i * cols2 + j] += mat1[i * cols1 + k] * mat2[k * cols2 + j];
-            }
-        }
-    });
-
-    return product;
-}
 
 // IDAMAX Correct!
 // Find the row with the maximum value in the column, starting from the k downwards.
@@ -57,10 +34,8 @@ int IDAMAX(const std::vector<float>& mat, int blockLength, int BigDimension, int
     return pivotRow;
 }
 
-
 // DSWAP Correct!
-// swap two rows of a matrix but only within a given range of columns
-// 交换row1和row2两行的从blockStartCol开始到blockStartCol+blockLength列的数据
+// swap the data in the blockStartCol to blockStartCol+blockLength columns of row1 and row2
 void DSWAP(std::vector<float>& mat, int blockStartCol, int endCol, int row1, int row2, int bigDimension) {
     if (row1 == row2) return;
     for (int i = blockStartCol; i < endCol; ++i) {
@@ -68,7 +43,7 @@ void DSWAP(std::vector<float>& mat, int blockStartCol, int endCol, int row1, int
     }
 }
 
-// 把pMat中的row1和row2两行的数据交换
+// Swap the elements in the P array
 // Correct!
 void SwapParray(std::vector<int>& pMat, int row1, int row2) {
     if (row1 == row2) return;
@@ -94,8 +69,9 @@ void DGER(std::vector<float>& mat, int bigDimension, int k, int blockStart, int 
     }
 }
 
-
+// Apply row interchanges to the left and the right of the panel.
 void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
+    // create a vector to keep track of which rows have been swapped to avoid duplicate swaps
     std::vector<int> isSwapped(pMat.size(), 0);
     // go through the P value related to this block
     for (int i = blockStart; i < blockStart+blockLength; ++i) {
@@ -113,12 +89,10 @@ void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockSta
     }
 }
 
-// compute U12  这个函数在3*3时有bug
-//  A12 = L11^-1 * A12
+// compute U12(A12)
+// A12 = L11^-1 * A12
 void DTRSM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
-    int offset = n - blockStart - blockLength; // 减少重复计算
-
-    // 直接在原始矩阵上操作以计算L11^-1 * A12，省略了临时L11和A12的构建
+    int offset = n - blockStart - blockLength;
     for (int i = 0; i < blockLength; ++i) {
         for (int j = 0; j < offset; ++j) {
             float sum = 0.0;
@@ -127,30 +101,13 @@ void DTRSM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
                        mat[(blockStart + k) * n + blockStart + blockLength + j];
             }
             mat[(blockStart + i) * n + blockStart + blockLength + j] -= sum;
-            // 假定对角线元素不为0（通常在LU分解中确保），无需每次检查
         }
     }
-
-    // 不需要单独的步骤来复制A12回mat，因为已经直接在mat上操作
-}
-
-bool LU_Decomposition(std::vector<float>& mat, int n) {
-    const float smallVal = 1e-12; // define a small value to check if a number is close to zero
-
-    for (int k = 0; k < n; ++k) {
-        for (int i = k + 1; i < n; ++i) {
-            mat[i*n + k] /= mat[k*n + k];
-            for (int j = k + 1; j < n; ++j) {
-                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
-            }
-        }
-    }
-    return true;
 }
 
 // Correct!! PA = LU
+// Naive LU decomposition, calculate the L and U for a block in mat matrix
 bool DGETF2(std::vector<float>& mat,std::vector<int>& pMat, int blockLength, int blockStartCol, int bigDimension) {
-    // k是列号
     for (int k = blockStartCol; k < blockStartCol+blockLength; ++k) {
         // find the pivot value in the k-th column and set that row index to pivotRow
         int pivotRow = IDAMAX(mat, blockLength, bigDimension,k);
@@ -165,22 +122,16 @@ bool DGETF2(std::vector<float>& mat,std::vector<int>& pMat, int blockLength, int
     return true;
 }
 
+// Computer L21(A21)
+// L21 = A21 * U11^-1
 void DTRSM_L21(std::vector<float>& mat, int n, int blockStart, int blockLength) {
-    // 对于A21中的每一行
     for (int i = blockStart + blockLength; i < n; ++i) {
-        // 对于U11中的每一列
         for (int j = blockStart; j < blockStart + blockLength; ++j) {
-            // 初始时假设L21的值就是A21的原始值
             float L21_value = mat[i * n + j];
-
-            // 通过U11的当前列之前的所有列进行迭代来更新L21的值
-            // 注意这里我们假设U11为上三角矩阵
             for (int k = blockStart; k < j; ++k) {
                 L21_value -= mat[i * n + k] * mat[k * n + j];
             }
-
-            // 分母为U11当前列的对角线元素，用于完成U11^-1的计算
-            if (mat[j * n + j] != 0) { // 确保不会除以0
+            if (mat[j * n + j] != 0) {
                 mat[i * n + j] = L21_value / mat[j * n + j];
             } else {
                 std::cerr << "Division by zero encountered in DTRSM_L21." << std::endl;
@@ -190,12 +141,11 @@ void DTRSM_L21(std::vector<float>& mat, int n, int blockStart, int blockLength) 
     }
 }
 
-void UpdateA22(std::vector<float>& mat, int n, int blockStart, int blockLength) {
-    // 对于A22的每一行
+// DGEMM to update A22
+// A22 = A22 - L21 * U12
+void DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
     for (int i = blockStart + blockLength; i < n; ++i) {
-        // 对于A22的每一列
         for (int j = blockStart + blockLength; j < n; ++j) {
-            // 计算L21 * U12的结果并从A22中减去
             float sum = 0.0;
             for (int k = blockStart; k < blockStart + blockLength; ++k) {
                 sum += mat[i * n + k] * mat[k * n + j];
@@ -217,7 +167,6 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
     //            A12 is 2*4 matrix
     //            A21 is 2*2 matrix
     //            A22 is 2*2 matrix
-
     // next loop applied to A22
 
     int blockStart = 0;
@@ -226,12 +175,12 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
         // applied LU factorization to A11, output L11 and U11 and P11
         DGETF2(mat, pMat, blockLength, blockStart, n);
 
-        // pMat example 1 0 2 3  indicates swap row 0 and 1
+        // pMat example: 1 0 2 3  indicates swap row 0 and 1
 
         // DLASWP -  Apply row interchanges to the left and the right of this block.
         DLASWP(mat, pMat, n, blockStart, blockLength);
 
-//         Compute U12
+        // compute U12
         DTRSM(mat, n, blockStart, blockLength);
 
         // compute L21
@@ -240,44 +189,31 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
 
         // update A22 here
         // A22 = A22 - L21 * U12
-        UpdateA22(mat, n, blockStart, blockLength);
-//            DGEMM(...);
+        DGEMM(mat, n, blockStart, blockLength);
     }
-    if (blockStart == n) {
-        return true;
-    }
-    DGETF2(mat, pMat, n-blockStart, blockStart, n);
-    DLASWP(mat, pMat, n, blockStart, n-blockStart);
-    return true;
-}
-
-// correct
-bool parallelLU_Decomposition(std::vector<float>& mat, int n) {
-    for (int k = 0; k < n; ++k) {
-        std::vector<int> index(n - (k + 1));
-        std::iota(index.begin(), index.end(), k + 1);
-
-        std::for_each(std::execution::par, index.begin(), index.end(), [&](int i) {
-            mat[i*n + k] /= mat[k*n + k];
-            for (int j = k + 1; j < n; ++j) {
-                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
-            }
-        });
+    // if there is a smaller block left
+    if (blockStart < n) {
+        DGETF2(mat, pMat, n-blockStart, blockStart, n);
+        DLASWP(mat, pMat, n, blockStart, n-blockStart);
     }
     return true;
 }
 
 int main() {
-    int n = 4; // dimension of the matrix
-//    std::vector<float> A = {2, 1,
-//                            4, 3 }; // matrix to be decomposed
+    int n = 5; // dimension of the matrix
 
-    std::vector<float> A = {2, 1, 1, 0,
-                            4, 3 ,3, 1,
-                            8, 7, 9, 5,
-                            6, 7, 9, 8} ; // matrix to be decomposed
+    std::vector<float> A = {2, 1, 1, 0, 4,
+                            4, 3 ,3, 1, 5,
+                            8, 7, 9, 5, 6,
+                            6, 7, 9, 8, 8,
+                            9, 2, 3, 4, 5} ; // matrix to be decomposed
 
-    // method 1
+//    std::vector<float> A = {2, 1, 1, 0,
+//                            4, 3 ,3, 1,
+//                            8, 7, 9, 5,
+//                            6, 7, 9, 8,
+//                            } ; // matrix to be decomposed
+
     std::vector<float> mat = A;
 
     std::vector<int> pMat(n);
@@ -297,64 +233,60 @@ int main() {
     for (int i = 0; i < n; ++i) {
         std::cout << pMat[i] << " ";
     }
-
-//    std::vector<int> pMat(n);
-//    std::iota(pMat.begin(), pMat.end(), 0);
-
-//    DGETF2(mat, pMat, 4, 0, n);
-//    std::cout << "Result of LU Decomposition (in-place):" << std::endl;
-//    for (int i = 0; i < n; ++i) {
-//        for (int j = 0; j < n; ++j) {
-//            std::cout << std::setw(8) << mat[i*n + j] << " ";
-//        }
-//        std::cout << std::endl;
-//    }
-//    std ::cout << "P array:" << std::endl;
-//    for (int i = 0; i < n; ++i) {
-//        std::cout << pMat[i] << " ";
-//    }
-
-
-//    std ::vector<int> pMat = {0, 1,
-//                              1, 0};
-//
-//    DLASWP(mat, pMat, n, 0, 1);
-
-
-
-//    std::cout << "Result of LU Decomposition (in-place):" << std::endl;
-//    for (int i = 0; i < n; ++i) {
-//        for (int j = 0; j < n; ++j) {
-//            std::cout << std::setw(8) << mat[i*n + j] << " ";
-//        }
-//        std::cout << std::endl;
-//    }
-//    std::cout << "P matrix:" << std::endl;
-//    for (int i = 0; i < n; ++i) {
-//        for (int j = 0; j < n; ++j) {
-//            std::cout << std::setw(8) << pMat[i*n + j] << " ";
-//        }
-//        std::cout << std::endl;
-//    }
-//
-//    // block method
-//    std::vector<float> mat2 = A;
-//    DGETRF(mat2, n, 2);
-//
-//    std::cout << "Result of LU Decomposition (block method):" << std::endl;
-//    for (int i = 0; i < n; ++i) {
-//        for (int j = 0; j < n; ++j) {
-//            std::cout << std::setw(8) << mat2[i*n + j] << " ";
-//        }
-//        std::cout << std::endl;
-//    }
-
     return 0;
 }
 
+//// correct
+//bool parallelLU_Decomposition(std::vector<float>& mat, int n) {
+//    for (int k = 0; k < n; ++k) {
+//        std::vector<int> index(n - (k + 1));
+//        std::iota(index.begin(), index.end(), k + 1);
+//
+//        std::for_each(std::execution::par, index.begin(), index.end(), [&](int i) {
+//            mat[i*n + k] /= mat[k*n + k];
+//            for (int j = k + 1; j < n; ++j) {
+//                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
+//            }
+//        });
+//    }
+//    return true;
+//}
 
-// receive a matrix and its dimension, and return the L and U matrices
-//bool LU_Decomposition2(const std::vector<float>& A, std::vector<float>& L, std::vector<float>& U, int n);
+//// DGEMM Correct!
+//std::vector<float> parallelMatrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2) {
+//    if (rows1 == 0 || cols1 == 0 || rows2 == 0 || cols2 == 0 || cols1 != rows2) {
+//        throw std::invalid_argument("Matrices cannot be multiplied due to size mismatch");
+//    }
+//
+//    std::vector<float> product(rows1 * cols2, 0.0f);
+//
+//    std::vector<int> index(rows1);
+//    std::iota(index.begin(), index.end(), 0);
+//
+//    std::for_each(std::execution::par, index.begin(), index.end(), [cols1, cols2, &mat1, &mat2, &product](int i) {
+//        for (int j = 0; j < cols2; ++j) {
+//            for (int k = 0; k < cols1; ++k) {
+//                product[i * cols2 + j] += mat1[i * cols1 + k] * mat2[k * cols2 + j];
+//            }
+//        }
+//    });
+//
+//    return product;
+//}
+
+//bool  Naive_LU_Decomposition(std::vector<float>& mat, int n) {
+//    const float smallVal = 1e-12; // define a small value to check if a number is close to zero
+//
+//    for (int k = 0; k < n; ++k) {
+//        for (int i = k + 1; i < n; ++i) {
+//            mat[i*n + k] /= mat[k*n + k];
+//            for (int j = k + 1; j < n; ++j) {
+//                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
+//            }
+//        }
+//    }
+//    return true;
+//}
 
 //// correct method 2, no need. just return one matrix
 //bool LU_Decomposition2(const std::vector<float>& A, std::vector<float>& L, std::vector<float>& U, int n) {
