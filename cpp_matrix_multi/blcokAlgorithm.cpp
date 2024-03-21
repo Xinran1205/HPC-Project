@@ -4,6 +4,10 @@
 #include <random>
 #include <execution>
 #include <algorithm>
+#include <numeric>
+#include <thread>
+#include <mutex>
+#include <set>
 
 std::vector<float> IJK_matrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2);
 std::vector<float> parallelMatrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2);

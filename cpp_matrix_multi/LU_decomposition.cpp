@@ -236,44 +236,6 @@ int main() {
     return 0;
 }
 
-//// correct
-//bool parallelLU_Decomposition(std::vector<float>& mat, int n) {
-//    for (int k = 0; k < n; ++k) {
-//        std::vector<int> index(n - (k + 1));
-//        std::iota(index.begin(), index.end(), k + 1);
-//
-//        std::for_each(std::execution::par, index.begin(), index.end(), [&](int i) {
-//            mat[i*n + k] /= mat[k*n + k];
-//            for (int j = k + 1; j < n; ++j) {
-//                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
-//            }
-//        });
-//    }
-//    return true;
-//}
-
-//// DGEMM Correct!
-//std::vector<float> parallelMatrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2) {
-//    if (rows1 == 0 || cols1 == 0 || rows2 == 0 || cols2 == 0 || cols1 != rows2) {
-//        throw std::invalid_argument("Matrices cannot be multiplied due to size mismatch");
-//    }
-//
-//    std::vector<float> product(rows1 * cols2, 0.0f);
-//
-//    std::vector<int> index(rows1);
-//    std::iota(index.begin(), index.end(), 0);
-//
-//    std::for_each(std::execution::par, index.begin(), index.end(), [cols1, cols2, &mat1, &mat2, &product](int i) {
-//        for (int j = 0; j < cols2; ++j) {
-//            for (int k = 0; k < cols1; ++k) {
-//                product[i * cols2 + j] += mat1[i * cols1 + k] * mat2[k * cols2 + j];
-//            }
-//        }
-//    });
-//
-//    return product;
-//}
-
 //bool  Naive_LU_Decomposition(std::vector<float>& mat, int n) {
 //    const float smallVal = 1e-12; // define a small value to check if a number is close to zero
 //
@@ -283,39 +245,6 @@ int main() {
 //            for (int j = k + 1; j < n; ++j) {
 //                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
 //            }
-//        }
-//    }
-//    return true;
-//}
-
-//// correct method 2, no need. just return one matrix
-//bool LU_Decomposition2(const std::vector<float>& A, std::vector<float>& L, std::vector<float>& U, int n) {
-//    const float EPS = 1e-12;
-//    L.resize(n * n, 0);
-//    U.resize(n * n, 0);
-//
-//    for (int i = 0; i < n; ++i) {
-//        L[i*n + i] = 1; // initialize the diagonal of L with 1
-//    }
-//
-//    for (int k = 0; k < n; ++k) {
-//        if (std::fabs(A[k*n + k]) < EPS) {
-//            std::cerr << "Pivot element is close to zero. Cannot proceed." << std::endl;
-//            return false;
-//        }
-//        for (int i = k; i < n; ++i) { // calculate U's row
-//            float sum = 0;
-//            for (int j = 0; j < k; ++j) {
-//                sum += L[k*n + j] * U[j*n + i];
-//            }
-//            U[k*n + i] = A[k*n + i] - sum;
-//        }
-//        for (int i = k + 1; i < n; ++i) { // calculate L's column
-//            float sum = 0;
-//            for (int j = 0; j < k; ++j) {
-//                sum += L[i*n + j] * U[j*n + k];
-//            }
-//            L[i*n + k] = (A[i*n + k] - sum) / U[k*n + k];
 //        }
 //    }
 //    return true;
