@@ -44,9 +44,15 @@ int IDAMAX(const std::vector<float>& mat, int blockLength, int BigDimension, int
 // can be parallel!!!!
 void DSWAP(std::vector<float>& mat, int blockStartCol, int endCol, int row1, int row2, int bigDimension) {
     if (row1 == row2) return;
-    for (int i = blockStartCol; i < endCol; ++i) {
+//    for (int i = blockStartCol; i < endCol; ++i) {
+//        std::swap(mat[row1*bigDimension + i], mat[row2*bigDimension + i]);
+//    }
+
+    std::vector<int> indices(endCol - blockStartCol);
+    std::iota(indices.begin(), indices.end(), blockStartCol);
+    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i) {
         std::swap(mat[row1*bigDimension + i], mat[row2*bigDimension + i]);
-    }
+    });
 }
 
 // Swap the elements in the P array
@@ -62,9 +68,19 @@ void SwapParray(std::vector<int>& pMat, int row1, int row2) {
 // can be parallel!!!!
 void DSCAL(std::vector<float>& mat, int n,int blockLength, int k, int blockStart) {
     // make k-th column but in a block all divided by the diagonal element
-    for (int i = k+1; i < blockStart+blockLength; ++i) {
-        mat[i*n + k] /= mat[k*n + k];
-    }
+//    for (int i = k+1; i < blockStart+blockLength; ++i) {
+//        mat[i*n + k] /= mat[k*n + k];
+//    }
+
+    int numElements = blockStart + blockLength - (k + 1);
+    std::vector<int> indices(numElements);
+    std::iota(indices.begin(), indices.end(), k + 1);
+    float diagonalElement = mat[k * n + k];
+
+    // every thread share the same diagonalElement
+    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i) {
+        mat[i * n + k] /= diagonalElement;
+    });
 }
 
 // DGER Correct!
@@ -77,7 +93,7 @@ void DGER(std::vector<float>& mat, int bigDimension, int k, int blockStart, int 
 //            mat[i*bigDimension + j] -= mat[i*bigDimension + k] * mat[k*bigDimension + j];
 //        }
 //    }
-    std::vector<int> indices(blockLength);
+    std::vector<int> indices(blockStart+blockLength - (k + 1));
     std::iota(indices.begin(), indices.end(), k + 1);
 
     std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i) {
@@ -87,8 +103,7 @@ void DGER(std::vector<float>& mat, int bigDimension, int k, int blockStart, int 
     });
 }
 
-// can not parallel!
-
+// cannot parallel!!!!!!
 // Apply row interchanges to the left and the right of the panel.
 void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
     // create a vector to keep track of which rows have been swapped to avoid duplicate swaps
@@ -133,8 +148,8 @@ void DTRSM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
 
     std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i) {
         // the sum variable is private to each thread
-        float sum = 0.0;
         for (int j = 0; j < offset; ++j) {
+            float sum = 0.0;
             for (int k = 0; k < i; ++k) {
                 sum += mat[(blockStart + i) * n + blockStart + k] *
                        mat[(blockStart + k) * n + blockStart + blockLength + j];
@@ -149,17 +164,61 @@ void DTRSM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
 
 // can be parallel, as same as above
 void DTRSM_L21(std::vector<float>& mat, int n, int blockStart, int blockLength) {
-    for (int i = blockStart + blockLength; i < n; ++i) {
-        for (int j = blockStart; j < blockStart + blockLength; ++j) {
-            float L21_value = mat[i * n + j];
-            for (int k = blockStart; k < j; ++k) {
-                L21_value -= mat[i * n + k] * mat[k * n + j];
+//    for (int i = blockStart + blockLength; i < n; ++i) {
+//        for (int j = blockStart; j < blockStart + blockLength; ++j) {
+//            float L21_value = mat[i * n + j];
+//            for (int k = blockStart; k < j; ++k) {
+//                L21_value -= mat[i * n + k] * mat[k * n + j];
+//            }
+//            if (mat[j * n + j] != 0) {
+//                mat[i * n + j] = L21_value / mat[j * n + j];
+//            }
+//        }
+//    }
+
+        std::vector<int> indices(n - blockStart - blockLength);
+        std::iota(indices.begin(), indices.end(), blockStart + blockLength);
+
+        std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i) {
+            for (int j = blockStart; j < blockStart + blockLength; ++j) {
+                float L21_value = mat[i * n + j];
+                for (int k = blockStart; k < j; ++k) {
+                    L21_value -= mat[i * n + k] * mat[k * n + j];
+                }
+                if (mat[j * n + j] != 0) {
+                    mat[i * n + j] = L21_value / mat[j * n + j];
+                }
             }
-            if (mat[j * n + j] != 0) {
-                mat[i * n + j] = L21_value / mat[j * n + j];
+        });
+}
+
+// DGEMM to update A22
+// A22 = A22 - L21 * U12
+
+// can be parallel, as same as above
+void DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
+//    for (int i = blockStart + blockLength; i < n; ++i) {
+//        for (int j = blockStart + blockLength; j < n; ++j) {
+//            float sum = 0.0;
+//            for (int k = blockStart; k < blockStart + blockLength; ++k) {
+//                sum += mat[i * n + k] * mat[k * n + j];
+//            }
+//            mat[i * n + j] -= sum;
+//        }
+//    }
+
+    std::vector<int> indices(n - blockStart - blockLength);
+    std::iota(indices.begin(), indices.end(), blockStart + blockLength);
+
+    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i) {
+        for (int j = blockStart + blockLength; j < n; ++j) {
+            float sum = 0.0;
+            for (int k = blockStart; k < blockStart + blockLength; ++k) {
+                sum += mat[i * n + k] * mat[k * n + j];
             }
+            mat[i * n + j] -= sum;
         }
-    }
+    });
 }
 
 // Correct!! PA = LU
@@ -177,22 +236,6 @@ bool DGETF2(std::vector<float>& mat,std::vector<int>& pMat, int blockLength, int
         DGER(mat, bigDimension, k, blockStartCol, blockLength);
     }
     return true;
-}
-
-// DGEMM to update A22
-// A22 = A22 - L21 * U12
-
-// can be parallel, as same as above
-void DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
-    for (int i = blockStart + blockLength; i < n; ++i) {
-        for (int j = blockStart + blockLength; j < n; ++j) {
-            float sum = 0.0;
-            for (int k = blockStart; k < blockStart + blockLength; ++k) {
-                sum += mat[i * n + k] * mat[k * n + j];
-            }
-            mat[i * n + j] -= sum;
-        }
-    }
 }
 
 // Main function for LU decomposition!
