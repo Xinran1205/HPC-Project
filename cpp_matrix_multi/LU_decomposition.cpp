@@ -70,21 +70,42 @@ void DGER(std::vector<float>& mat, int bigDimension, int k, int blockStart, int 
 }
 
 // Apply row interchanges to the left and the right of the panel.
-void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
-    // create a vector to keep track of which rows have been swapped to avoid duplicate swaps
-    std::vector<int> isSwapped(pMat.size(), 0);
-    // go through the P value related to this block
-    for (int i = blockStart; i < blockStart+blockLength; ++i) {
-        if (i != pMat[i] && isSwapped[i] != pMat[i]){
-            //avoid swap the block part of the matrix
-            // swap the left part of the matrix
-            DSWAP(mat, 0, blockStart, i, pMat[i], n);
-            // swap the right part of the matrix
-            DSWAP(mat, blockStart+blockLength, n, i, pMat[i], n);
+//void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
+//    // create a vector to keep track of which rows have been swapped to avoid duplicate swaps
+//    std::vector<int> isSwapped(pMat.size(), 0);
+//    // go through the P value related to this block
+//    for (int i = blockStart; i < blockStart+blockLength; ++i) {
+//        if (i != pMat[i] && isSwapped[i] != pMat[i]){
+//            //avoid swap the block part of the matrix
+//            // swap the left part of the matrix
+//            DSWAP(mat, 0, blockStart, i, pMat[i], n);
+//            // swap the right part of the matrix
+//            DSWAP(mat, blockStart+blockLength, n, i, pMat[i], n);
+//
+//            // avoid swapping the same row twice
+//            isSwapped[i] = pMat[i];
+//            isSwapped[pMat[i]] = i;
+//        }
+//    }
+//}
 
-            // avoid swapping the same row twice
-            isSwapped[i] = pMat[i];
-            isSwapped[pMat[i]] = i;
+// Apply row interchanges to the left and the right of the panel.
+// 这个应该是完全正确的，但是这个拷贝非常恶心人！
+void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
+    // 创建一个大小是blocklength*n的新矩阵，然后把mat的值拷贝到这个新矩阵中，然后再根据pMat的值，把新矩阵的值拷贝回mat中
+    std::vector<float> tempMat(blockLength*n, 0);
+    for (int i = 0; i < blockLength; ++i) {
+        for (int j = 0; j < n; ++j) {
+            tempMat[i*n + j] = mat[(blockStart+i)*n + j];
+        }
+    }
+    // 根据pMat的值，把tempMat中的值拷贝回mat中
+    for (int i = 0; i < blockLength; ++i) {
+        for (int j = 0; j < n; ++j) {
+            // 需要加入判断，不要动block区域的值，并且如果pMat中的值和现在的行号相同也不用动
+            if (j < blockStart || j >= blockStart+blockLength && blockStart+i != pMat[blockStart+i]) {
+                mat[(blockStart+i)*n + j] = tempMat[(pMat[blockStart+i]-blockStart)*n + j];
+            }
         }
     }
 }
@@ -174,6 +195,13 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
 
         // applied LU factorization to A11, output L11 and U11 and P11
         DGETF2(mat, pMat, blockLength, blockStart, n);
+//        // 当blockStart=0时，打印P的前3个
+//        if (blockStart == 0) {
+//            for (int i = 0; i < 3; ++i) {
+//                std::cout << pMat[i] << " ";
+//            }
+//            std::cout << std::endl;
+//        }
 
         // pMat example: 1 0 2 3  indicates swap row 0 and 1
 
@@ -199,14 +227,45 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
     return true;
 }
 
-int main() {
-    int n = 5; // dimension of the matrix
+std::vector<float> generateRandomMatrix(int rows, int cols) {
+    std::vector<float> mat(rows * cols);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> distrib(0.0f, 100.0f);
 
-    std::vector<float> A = {2, 1, 1, 0, 4,
-                            4, 3 ,3, 1, 5,
-                            8, 7, 9, 5, 6,
-                            6, 7, 9, 8, 8,
-                            9, 2, 3, 4, 5} ; // matrix to be decomposed
+    for (int i = 0; i < rows * cols; ++i) {
+        mat[i] = distrib(gen);
+    }
+    return mat;
+}
+
+std::vector<float> matrixMultiply(const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2) {
+    if (rows1 == 0 || cols1 == 0 || rows2 == 0 || cols2 == 0 || cols1 != rows2) {
+        throw std::invalid_argument("Matrices cannot be multiplied due to size mismatch");
+    }
+
+    std::vector<float> product(rows1 * cols2, 0.0f);
+
+    for (int i = 0; i < rows1; ++i) {
+        for (int j = 0; j < cols2; ++j) {
+            for (int k = 0; k < cols1; ++k) {
+                product[i * cols2 + j] += mat1[i * cols1 + k] * mat2[k * cols2 + j];
+            }
+        }
+    }
+
+    return product;
+}
+
+int main() {
+
+//    int n = 5; // dimension of the matrix
+//
+//    std::vector<float> A = {2, 1, 1, 0, 4,
+//                            4, 3 ,3, 1, 5,
+//                            8, 7, 9, 5, 6,
+//                            6, 7, 9, 8, 8,
+//                            9, 2, 3, 4, 5} ; // matrix to be decomposed
 
 //    std::vector<float> A = {2, 1, 1, 0,
 //                            4, 3 ,3, 1,
@@ -214,25 +273,69 @@ int main() {
 //                            6, 7, 9, 8,
 //                            } ; // matrix to be decomposed
 
-    std::vector<float> mat = A;
+    std::vector<int> sizes = {7,2,3,1,9,10,24,52,70,100};
+    for (int n : sizes) {
+        auto A = generateRandomMatrix(n, n);
+//        // 打印A
+//        for (int i = 0; i < n; ++i) {
+//            for (int j = 0; j < n; ++j) {
+//                std::cout << std::setw(10) << A[i * n + j] << " ";
+//            }
+//            std::cout << std::endl;
+//        }
 
-    std::vector<int> pMat(n);
-    std::iota(pMat.begin(), pMat.end(), 0);
+        std::vector<float> mat = A;
 
-    DGETRF(mat, n, 3,pMat);
+        std::vector<int> pMat(n);
+        std::iota(pMat.begin(), pMat.end(), 0);
 
-    std::cout << "Result of LU Decomposition (in-place):" << std::endl;
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            std::cout << std::setw(8) << mat[i*n + j] << " ";
+        DGETRF(mat, n, 3, pMat);
+        // 我需要在这里写一个自动化校验，新创建两个矩阵，一个是L，一个是U，大小都和A一样，然后把mat中的值分别填入L和U中，然后再把L和U相乘，
+        // 然后把相乘的结果根据P矩阵还原成原来的矩阵，然后和A比较，如果相等，说明分解正确
+
+        std::vector<float> L(n * n, 0);
+        std::vector<float> U(n * n, 0);
+        for (int i = 0; i < n; ++i) {
+            L[i * n + i] = 1;
         }
-        std::cout << std::endl;
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                if (i <= j) {
+                    U[i * n + j] = mat[i * n + j];
+                } else {
+                    L[i * n + j] = mat[i * n + j];
+                }
+            }
+        }
+        std::vector<float> product = matrixMultiply(L, U, n, n, n, n);
+        std::vector<float> result(n * n, 0);
+        // 根据p的这一行的值，把product中的值还原到result中
+        // pMat example: 1 0 2 3  indicates swap row 0 and 1
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                result[pMat[i] * n + j] = product[i * n + j];
+            }
+        }
+
+        // 比较result和A是否相等，for循环比较
+        bool isEqual = true;
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                // 这里可能会存在一些误差！
+                if (std::fabs(result[i * n + j] - A[i * n + j]) > 1) {
+                    // 打印不相等的值
+                    std::cout << "result[" << i << "][" << j << "] = " << result[i * n + j] << ", A[" << i << "][" << j << "] = " << A[i * n + j] << std::endl;
+                    isEqual = false;
+                }
+            }
+        }
+        if (isEqual) {
+            std::cout << "Decomposition succeeded!" << std::endl;
+        } else {
+            std::cout << "Decomposition failed!" << std::endl;
+        }
     }
 
-    std ::cout << "P array:" << std::endl;
-    for (int i = 0; i < n; ++i) {
-        std::cout << pMat[i] << " ";
-    }
     return 0;
 }
 
