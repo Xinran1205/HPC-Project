@@ -43,18 +43,25 @@ std::vector<float> parallelMatrixMultiply(const std::vector<float>& mat1, const 
     if (rows1 == 0 || cols1 == 0 || rows2 == 0 || cols2 == 0 || cols1 != rows2) {
         throw std::invalid_argument("Matrices cannot be multiplied due to size mismatch");
     }
+    unsigned int n = std::thread::hardware_concurrency();
+    std::cout << "Number of concurrent threads supported: " << n << std::endl;
 
     std::vector<float> product(rows1 * cols2, 0.0f);
 
     std::vector<int> index(rows1);
     std::iota(index.begin(), index.end(), 0);
 
-    std::for_each(std::execution::par, index.begin(), index.end(), [cols1, cols2, &mat1, &mat2, &product](int i) {
+    std::mutex cout_mutex; // used to print the thread id and the row being processed
+
+    std::for_each(std::execution::par_unseq, index.begin(), index.end(), [&cout_mutex, cols1, cols2, &mat1, &mat2, &product](int i) {
         for (int j = 0; j < cols2; ++j) {
             for (int k = 0; k < cols1; ++k) {
                 product[i * cols2 + j] += mat1[i * cols1 + k] * mat2[k * cols2 + j];
             }
         }
+//        // print the thread id and the row being processed
+//        std::lock_guard<std::mutex> lock(cout_mutex);
+//        std::cout << "Thread ID: " << std::this_thread::get_id() << ", processing row: " << i << std::endl;
     });
 
     return product;
@@ -186,7 +193,7 @@ std::pair<double, double> executeAndMeasure(Func matrixMultiply, const std::vect
 
 int main() {
     int blockSize = 64; // Define a suitable block size based on your system's cache size
-    std::vector<int> sizes = {30,500,253,14,235,1,2,3};
+    std::vector<int> sizes = {1000,50,2,3,4,5,24};
     for (int n : sizes) {
         auto mat1 = generateRandomMatrix(n, n);
         auto mat2 = generateRandomMatrix(n, n);
