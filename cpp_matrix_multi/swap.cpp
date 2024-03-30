@@ -7,7 +7,7 @@
 void reorderArrayToMatch(std::vector<int>& A, const std::vector<int>& B) {
     for (int i = 0; i < A.size(); ++i) {
         // when A[i] is not in the correct position
-        while (A[i] != B[i]) {
+        if (A[i] != B[i]) {
             // find the index of the element that should be swapped with A[i]
             int swapIndex = -1;
             for (int j = 0; j < A.size(); ++j) {
