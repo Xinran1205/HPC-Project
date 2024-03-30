@@ -65,32 +65,66 @@ void PDGER(std::vector<float>& mat, int bigDimension, int k, int blockStart, int
     });
 }
 
-// This is not a good algorithm, because it copies the whole block (A12,left and right of the A11 block) to a temporary
-// matrix and then copies it back.
-// Should use line swap, but not easy to implement
+// Apply row interchanges to the left and the right of the panel.
 void PDLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
-    std::vector<float> tempMat(blockLength*n, 0);
-    std::vector<int> indices(blockLength);
-    std::iota(indices.begin(), indices.end(), 0);
+    // create a vector to keep track of which rows have been swapped to avoid duplicate swaps
 
-    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i){
-        for (int j = 0; j < n; ++j) {
-            tempMat[i*n + j] = mat[(blockStart+i)*n + j];
-        }
-    });
+    // create a vector A, the values are from blockStart to blockStart+blockLength-1
+    std::vector<int> A(blockLength);
+    std::iota(A.begin(), A.end(), 0);
 
-    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i){
-        for (int j = 0; j < n; ++j) {
-            if (j < blockStart || j >= blockStart+blockLength && blockStart+i != pMat[blockStart+i]) {
-                mat[(blockStart+i)*n + j] = tempMat[(pMat[blockStart+i]-blockStart)*n + j];
+    // no need to parallelize this loop, A is just a small vector with blockLength elements
+    for (int i = 0; i < A.size(); ++i) {
+        // when A[i] is not in the correct position
+        if (A[i]+blockStart != pMat[i+blockStart]) {
+            // find the index of the element that should be swapped with A[i]
+            int swapIndex = -1;
+            for (int j = 0; j < A.size(); ++j) {
+                if (A[j]+blockStart == pMat[i+blockStart]) {
+                    swapIndex = j;
+                    break;
+                }
             }
+
+            // swap the left part of the matrix
+
+            // thses two swaps are parallel, because the size of the part that needs to be swapped is n-blockLength,
+            // which is large, so it needs to be processed in parallel
+            PDSWAP(mat, 0, blockStart, i+blockStart, swapIndex+blockStart, n);
+            // swap the right part of the matrix
+            PDSWAP(mat, blockStart+blockLength, n, i+blockStart, swapIndex+blockStart, n);
+
+            std::swap(A[i], A[swapIndex]);
         }
-    });
+    }
 }
+
+//// This is not a good algorithm, because it copies the whole block (A12,left and right of the A11 block) to a temporary
+//// matrix and then copies it back.
+//// Should use line swap, but not easy to implement
+//void PDLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
+//    std::vector<float> tempMat(blockLength*n, 0);
+//    std::vector<int> indices(blockLength);
+//    std::iota(indices.begin(), indices.end(), 0);
+//
+//    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i){
+//        for (int j = 0; j < n; ++j) {
+//            tempMat[i*n + j] = mat[(blockStart+i)*n + j];
+//        }
+//    });
+//
+//    std::for_each(std::execution::par, indices.begin(), indices.end(), [&](int i){
+//        for (int j = 0; j < n; ++j) {
+//            if (j < blockStart || j >= blockStart+blockLength && blockStart+i != pMat[blockStart+i]) {
+//                mat[(blockStart+i)*n + j] = tempMat[(pMat[blockStart+i]-blockStart)*n + j];
+//            }
+//        }
+//    });
+//}
+
 
 // compute U12(A12)
 // A12 = L11^-1 * A12
-
 // cannot parallelize i, because the calculation of U12, for example, the second row or the third row,
 // they all depend on the values of the previous rows
 // but can parallelize j
@@ -190,7 +224,7 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
 
         // pMat example: 1 0 2 3  indicates swap row 0 and 1
 
-        // DLASWP -  Apply row interchanges to the left and the right of this block.
+        // PDLASWP -  Apply row interchanges to the left and the right of this block.
         PDLASWP(mat, pMat, n, blockStart, blockLength);
 
         // compute U12
@@ -259,7 +293,7 @@ int main() {
 //                            6, 7, 9, 8,
 //                            } ; // matrix to be decomposed
 
-    std::vector<int> sizes = {231,1,2,3,102,101,103,200};
+    std::vector<int> sizes = {23,1,2,3,4,100,111,101,102,103,104};
     for (int n : sizes) {
         auto A = generateRandomMatrix(n, n);
 //        // print A
@@ -282,6 +316,10 @@ int main() {
         // then fill the values in mat into L and U respectively,
         // then multiply L and U, then restore the result according to the P matrix to the original matrix,
 
+        // print PMat
+//        for (int i = 0; i < n; ++i) {
+//            std::cout << pMat[i] << " ";
+//        }
         std::vector<float> L(n * n, 0);
         std::vector<float> U(n * n, 0);
         for (int i = 0; i < n; ++i) {

@@ -71,47 +71,60 @@ void DGER(std::vector<float>& mat, int bigDimension, int k, int blockStart, int 
 }
 
 // Apply row interchanges to the left and the right of the panel.
-//void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
-//    // create a vector to keep track of which rows have been swapped to avoid duplicate swaps
-//    std::vector<int> isSwapped(pMat.size(), 0);
-//    // go through the P value related to this block
-//    for (int i = blockStart; i < blockStart+blockLength; ++i) {
-//        if (i != pMat[i] && isSwapped[i] != pMat[i]){
-//            //avoid swap the block part of the matrix
-//            // swap the left part of the matrix
-//            DSWAP(mat, 0, blockStart, i, pMat[i], n);
-//            // swap the right part of the matrix
-//            DSWAP(mat, blockStart+blockLength, n, i, pMat[i], n);
-//
-//            // avoid swapping the same row twice
-//            isSwapped[i] = pMat[i];
-//            isSwapped[pMat[i]] = i;
-//        }
-//    }
-//}
-
-// Apply row interchanges to the left and the right of the panel.
-// this is totally correct, but the copy is a bad idea!
 void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
-    // create a size of blockLength*n matrix, then copy the values of mat to this new matrix,
-    // then according to the value of pMat, copy the values of the new matrix back to mat
-    std::vector<float> tempMat(blockLength*n, 0);
-    for (int i = 0; i < blockLength; ++i) {
-        for (int j = 0; j < n; ++j) {
-            tempMat[i*n + j] = mat[(blockStart+i)*n + j];
-        }
-    }
-    // copy the values of tempMat back to mat according to the value of pMat
-    for (int i = 0; i < blockLength; ++i) {
-        for (int j = 0; j < n; ++j) {
-            // if the value of pMat is the same as the row number, then no need to swap
-            // no need to swap the values in the block area
-            if (j < blockStart || j >= blockStart+blockLength && blockStart+i != pMat[blockStart+i]) {
-                mat[(blockStart+i)*n + j] = tempMat[(pMat[blockStart+i]-blockStart)*n + j];
+    // create a vector to keep track of which rows have been swapped to avoid duplicate swaps
+
+    // create a vector A, the values are from blockStart to blockStart+blockLength-1
+    std::vector<int> A(blockLength);
+    std::iota(A.begin(), A.end(), 0);
+
+    for (int i = 0; i < A.size(); ++i) {
+        // when A[i] is not in the correct position
+        if (A[i]+blockStart != pMat[i+blockStart]) {
+            // find the index of the element that should be swapped with A[i]
+            int swapIndex = -1;
+            for (int j = 0; j < A.size(); ++j) {
+                if (A[j]+blockStart == pMat[i+blockStart]) {
+                    swapIndex = j;
+                    break;
+                }
             }
+
+            // actually no need to check swapIndex, because the swapIndex must be found
+//            if (swapIndex != -1) {
+            // swap the left part of the matrix
+            DSWAP(mat, 0, blockStart, i+blockStart, swapIndex+blockStart, n);
+            // swap the right part of the matrix
+            DSWAP(mat, blockStart+blockLength, n, i+blockStart, swapIndex+blockStart, n);
+
+            std::swap(A[i], A[swapIndex]);
+//            }
         }
     }
 }
+
+// Apply row interchanges to the left and the right of the panel.
+// this is totally correct, but the copy is a bad idea!
+//void DLASWP(std::vector<float>& mat, std::vector<int>& pMat, int n, int blockStart, int blockLength) {
+//    // create a size of blockLength*n matrix, then copy the values of mat to this new matrix,
+//    // then according to the value of pMat, copy the values of the new matrix back to mat
+//    std::vector<float> tempMat(blockLength*n, 0);
+//    for (int i = 0; i < blockLength; ++i) {
+//        for (int j = 0; j < n; ++j) {
+//            tempMat[i*n + j] = mat[(blockStart+i)*n + j];
+//        }
+//    }
+//    // copy the values of tempMat back to mat according to the value of pMat
+//    for (int i = 0; i < blockLength; ++i) {
+//        for (int j = 0; j < n; ++j) {
+//            // if the value of pMat is the same as the row number, then no need to swap
+//            // no need to swap the values in the block area
+//            if (j < blockStart || j >= blockStart+blockLength && blockStart+i != pMat[blockStart+i]) {
+//                mat[(blockStart+i)*n + j] = tempMat[(pMat[blockStart+i]-blockStart)*n + j];
+//            }
+//        }
+//    }
+//}
 
 // compute U12(A12)
 // A12 = L11^-1 * A12
@@ -266,7 +279,7 @@ int main() {
 //                            6, 7, 9, 8,
 //                            } ; // matrix to be decomposed
 
-    std::vector<int> sizes = {70,1,2,3,4,5,87,23,45,251,253};
+    std::vector<int> sizes = {6,1,2,3,234,232,231,230,100,4,5,111,101};
     for (int n : sizes) {
         auto A = generateRandomMatrix(n, n);
 
@@ -275,7 +288,7 @@ int main() {
         std::vector<int> pMat(n);
         std::iota(pMat.begin(), pMat.end(), 0);
 
-        DGETRF(mat, n, 3, pMat);
+        DGETRF(mat, n, 9, pMat);
 //         print P
 //        for (int i = 0; i < n; ++i) {
 //            std::cout << pMat[i] << " ";
