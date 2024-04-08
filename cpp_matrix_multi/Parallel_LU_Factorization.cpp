@@ -184,9 +184,40 @@ void PDGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
     });
 }
 
+void PBLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength = 5) {
+    // can assume that smallBlockLength is equal to blockLength, which may be tested later
+    int A22start = blockStart + blockLength;
+
+    // Create a vector to hold all the block pairs for parallel processing
+    std::vector<std::pair<int, int>> blockPairs;
+    for (int ii = A22start; ii < n; ii += smallBlockLength) {
+        for (int jj = A22start; jj < n; jj += smallBlockLength) {
+            blockPairs.emplace_back(ii, jj);
+        }
+    }
+
+    // Use parallel algorithm to process each block
+    std::for_each(std::execution::par, blockPairs.begin(), blockPairs.end(),
+                  [&](const std::pair<int, int>& block) {
+                      int ii = block.first;
+                      int jj = block.second;
+                      for (int kk = blockStart; kk < A22start; kk += smallBlockLength) {
+                          for (int i = ii; i < std::min(ii + smallBlockLength, n); ++i) {
+                              for (int j = jj; j < std::min(jj + smallBlockLength, n); ++j) {
+                                  float sum = 0.0;
+                                  for (int k = kk; k < std::min(kk + smallBlockLength, A22start); ++k) {
+                                      sum += mat[i * n + k] * mat[k * n + j];
+                                  }
+                                  mat[i * n + j] -= sum;
+                              }
+                          }
+                      }
+                  });
+}
+
 // PA = LU
 // Naive LU decomposition, calculate the L and U for a block in mat matrix
-bool DGETF2(std::vector<float>& mat,std::vector<int>& pMat, int blockLength, int blockStartCol, int bigDimension) {
+bool PDGETF2(std::vector<float>& mat,std::vector<int>& pMat, int blockLength, int blockStartCol, int bigDimension) {
     for (int k = blockStartCol; k < blockStartCol+blockLength; ++k) {
         // find the pivot value in the k-th column and set that row index to pivotRow
         int pivotRow = IDAMAX(mat, blockLength, bigDimension,k, blockStartCol);
@@ -203,7 +234,7 @@ bool DGETF2(std::vector<float>& mat,std::vector<int>& pMat, int blockLength, int
 }
 
 // Main function for LU decomposition!
-bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& pMat) {
+bool PDGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& pMat) {
 
     //A11 A12
     //A21 A22
@@ -220,7 +251,7 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
     for (; blockStart+blockLength <= n; blockStart+=blockLength) {
 
         // applied LU factorization to A11, output L11 and U11 and P11
-        DGETF2(mat, pMat, blockLength, blockStart, n);
+        PDGETF2(mat, pMat, blockLength, blockStart, n);
 
         // pMat example: 1 0 2 3  indicates swap row 0 and 1
 
@@ -236,11 +267,11 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
 
         // update A22 here
         // A22 = A22 - L21 * U12
-        PDGEMM(mat, n, blockStart, blockLength);
+        PBLOCK_DGEMM(mat, n, blockStart, blockLength);
     }
     // if there is a smaller block left
     if (blockStart < n) {
-        DGETF2(mat, pMat, n-blockStart, blockStart, n);
+        PDGETF2(mat, pMat, n-blockStart, blockStart, n);
         PDLASWP(mat, pMat, n, blockStart, n-blockStart);
     }
     return true;
@@ -310,7 +341,7 @@ int main() {
         std::vector<int> pMat(n);
         std::iota(pMat.begin(), pMat.end(), 0);
 
-        DGETRF(mat, n, 3, pMat);
+        PDGETRF(mat, n, 3, pMat);
 
         // create two new matrices, one is L and the other is U, both the same size as A,
         // then fill the values in mat into L and U respectively,

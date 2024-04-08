@@ -189,6 +189,42 @@ void DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength) {
     }
 }
 
+
+// BLOCK_DGEMM to update A22
+// A22 = A22 - L21 * U12
+//void BLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength) {
+//    // can assume that smallBlockLength is equal to blockLength, which may be tested later
+//    for (int i = blockStart + blockLength; i < n; ++i) {
+//        for (int j = blockStart + blockLength; j < n; ++j) {
+//            float sum = 0.0;
+//            for (int k = blockStart; k < blockStart + blockLength; ++k) {
+//                sum += mat[i * n + k] * mat[k * n + j];
+//            }
+//            mat[i * n + j] -= sum;
+//        }
+//    }
+//}
+
+void BLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength = 5) {
+    // can assume that smallBlockLength is equal to blockLength, which may be tested later
+    int A22start = blockStart + blockLength;
+    for (int ii = A22start; ii < n; ii += smallBlockLength) {
+        for (int jj = A22start; jj < n; jj += smallBlockLength) {
+            for (int kk = blockStart; kk < A22start; kk += smallBlockLength) {
+                for (int i = ii; i < std::min(ii + smallBlockLength, n); ++i) {
+                    for (int j = jj; j < std::min(jj + smallBlockLength, n); ++j) {
+                        float sum = 0.0;
+                        for (int k = kk; k < std::min(kk + smallBlockLength, A22start); ++k) {
+                            sum += mat[i * n + k] * mat[k * n + j];
+                        }
+                        mat[i * n + j] -= sum;
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Main function for LU decomposition!
 bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& pMat) {
 
@@ -223,7 +259,7 @@ bool DGETRF(std::vector<float>& mat, int n, int blockLength, std::vector<int>& p
 
         // update A22 here
         // A22 = A22 - L21 * U12
-        DGEMM(mat, n, blockStart, blockLength);
+        BLOCK_DGEMM(mat, n, blockStart, blockLength);
     }
     // if there is a smaller block left
     if (blockStart < n) {
