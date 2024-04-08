@@ -2,7 +2,7 @@
 
 // use three vectors to store the non-zero elements and their positions
 template<typename T>
-class SparseMatrix : public IMatrix<T> {
+class SparseMatrixCOO : public IMatrix<T> {
 private:
     std::vector<T> values;
     std::vector<size_t> rowIndices;
@@ -10,11 +10,11 @@ private:
     size_t rows, cols;
 
 public:
-    SparseMatrix(size_t numRows, size_t numCols);
-    SparseMatrix(std::initializer_list<std::initializer_list<T>> matrix);
-    SparseMatrix(const std::vector<std::vector<T>>& data);
+    SparseMatrixCOO(size_t numRows, size_t numCols);
+    SparseMatrixCOO(std::initializer_list<std::initializer_list<T>> matrix);
+    SparseMatrixCOO(const std::vector<std::vector<T>>& data);
 
-    SparseMatrix<T> transpose() const;
+    SparseMatrixCOO<T> transpose() const;
     void setElement(size_t row, size_t col, T value);
     void printNonZeroElements() const override;
     T& operator()(size_t row, size_t col) override;
@@ -22,12 +22,12 @@ public:
     size_t getRows() const override;
     size_t getCols() const override;
 
-    friend SparseMatrix<T> operator+(const SparseMatrix<T>& a, const SparseMatrix<T>& b) {
+    friend SparseMatrixCOO<T> operator+(const SparseMatrixCOO<T>& a, const SparseMatrixCOO<T>& b) {
         if (a.rows != b.rows || a.cols != b.cols) {
             throw std::invalid_argument("Matrices dimensions do not match");
         }
 
-        SparseMatrix<T> result(a.rows, a.cols);
+        SparseMatrixCOO<T> result(a.rows, a.cols);
 
         // put the elements of the first matrix into the result matrix
         for (size_t i = 0; i < a.values.size(); i++) {
@@ -59,10 +59,10 @@ public:
 };
 
 template<typename T>
-SparseMatrix<T>::SparseMatrix(size_t numRows, size_t numCols) : rows(numRows), cols(numCols) {}
+SparseMatrixCOO<T>::SparseMatrixCOO(size_t numRows, size_t numCols) : rows(numRows), cols(numCols) {}
 
 template<typename T>
-SparseMatrix<T>::SparseMatrix(std::initializer_list<std::initializer_list<T>> matrix) {
+SparseMatrixCOO<T>::SparseMatrixCOO(std::initializer_list<std::initializer_list<T>> matrix) {
     rows = matrix.size();
     cols = rows ? matrix.begin()->size() : 0;
     for (size_t i = 0; i < rows; ++i) {
@@ -79,7 +79,7 @@ SparseMatrix<T>::SparseMatrix(std::initializer_list<std::initializer_list<T>> ma
 }
 
 template<typename T>
-SparseMatrix<T>::SparseMatrix(const std::vector<std::vector<T>>& data) {
+SparseMatrixCOO<T>::SparseMatrixCOO(const std::vector<std::vector<T>>& data) {
     rows = data.size();
     cols = rows ? data[0].size() : 0;
 
@@ -97,8 +97,8 @@ SparseMatrix<T>::SparseMatrix(const std::vector<std::vector<T>>& data) {
 }
 
 template<typename T>
-SparseMatrix<T> SparseMatrix<T>:: transpose() const {
-    SparseMatrix<T> result(cols, rows);
+SparseMatrixCOO<T> SparseMatrixCOO<T>:: transpose() const {
+    SparseMatrixCOO<T> result(cols, rows);
     for (size_t i = 0; i < values.size(); ++i) {
         result.setElement(colIndices[i], rowIndices[i], values[i]);
     }
@@ -106,7 +106,7 @@ SparseMatrix<T> SparseMatrix<T>:: transpose() const {
 }
 
 template<typename T>
-void SparseMatrix<T>:: printNonZeroElements() const {
+void SparseMatrixCOO<T>:: printNonZeroElements() const {
     std::cout << "Non-zero elements and their positions:" << std::endl;
     for (size_t i = 0; i < values.size(); ++i) {
         std::cout << "Value: " << values[i]
@@ -116,7 +116,7 @@ void SparseMatrix<T>:: printNonZeroElements() const {
 }
 
 template<typename T>
-void SparseMatrix<T>:: setElement(size_t row, size_t col, T value) {
+void SparseMatrixCOO<T>:: setElement(size_t row, size_t col, T value) {
     if (row >= rows || col >= cols) {
         throw std::out_of_range("Index out of range");
     }
@@ -134,7 +134,7 @@ void SparseMatrix<T>:: setElement(size_t row, size_t col, T value) {
 }
 
 template<typename T>
-T& SparseMatrix<T>:: operator()(size_t row, size_t col){
+T& SparseMatrixCOO<T>:: operator()(size_t row, size_t col){
     if (row >= rows || col >= cols) {
         throw std::out_of_range("Index out of range");
     }
@@ -147,7 +147,7 @@ T& SparseMatrix<T>:: operator()(size_t row, size_t col){
 }
 
 template<typename T>
-const T& SparseMatrix<T>:: operator()(size_t row, size_t col) const{
+const T& SparseMatrixCOO<T>:: operator()(size_t row, size_t col) const{
     if (row >= rows || col >= cols) {
         throw std::out_of_range("Index out of range");
     }
@@ -161,11 +161,11 @@ const T& SparseMatrix<T>:: operator()(size_t row, size_t col) const{
 }
 
 template<typename T>
-size_t SparseMatrix<T>:: getRows() const{
+size_t SparseMatrixCOO<T>:: getRows() const{
     return rows;
 }
 
 template<typename T>
-size_t SparseMatrix<T>:: getCols() const{
+size_t SparseMatrixCOO<T>:: getCols() const{
     return cols;
 }

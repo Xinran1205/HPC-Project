@@ -1,5 +1,5 @@
 #include "Matrix.hpp"
-#include "SparseMatrix.hpp"
+#include "SparseMatrixCOO.hpp"
 #include "SparseMatrixCSR.hpp"
 
 std::vector<std::vector<float>> generateRandomMatrix(int rows, int cols) {
@@ -120,14 +120,14 @@ int main() {
     }
 
 // test sparse matrix
-    SparseMatrix<int> matrix1 = {
+    SparseMatrixCOO<int> matrix1 = {
             {0, 0, 3, 0, 0},
             {4, 0, 0, 0, 0},
             {0, 5, 6, 0, 0},
             {0, 0, 0, 0, 0},
             {0, 0, 0, 7, 0}
     };
-    SparseMatrix<int> matrix2 = {
+    SparseMatrixCOO<int> matrix2 = {
             {1, 2, 3, 0, 0},
             {4, 0, 0, 0, 0},
             {0, 5, 6, 8, 0},
@@ -135,10 +135,10 @@ int main() {
             {0, 0, 0, 7, 0}
     };
 
-    SparseMatrix<int> matrix2_transpose = matrix2.transpose();
+    SparseMatrixCOO<int> matrix2_transpose = matrix2.transpose();
     matrix2_transpose.printNonZeroElements();
 
-    SparseMatrix<int> result1 = matrix1 + matrix2;
+    SparseMatrixCOO<int> result1 = matrix1 + matrix2;
     // print the non-zero elements of the result matrix
     result1.printNonZeroElements();
 
