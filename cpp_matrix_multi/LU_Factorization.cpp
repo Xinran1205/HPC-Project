@@ -372,16 +372,16 @@ int main() {
     return 0;
 }
 
-//bool  Naive_LU_Decomposition(std::vector<float>& mat, int n) {
-//    const float smallVal = 1e-12; // define a small value to check if a number is close to zero
-//
-//    for (int k = 0; k < n; ++k) {
-//        for (int i = k + 1; i < n; ++i) {
-//            mat[i*n + k] /= mat[k*n + k];
-//            for (int j = k + 1; j < n; ++j) {
-//                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
-//            }
-//        }
-//    }
-//    return true;
-//}
+bool  Naive_LU_Decomposition(std::vector<float>& mat, int n) {
+    const float smallVal = 1e-12; // define a small value to check if a number is close to zero
+
+    for (int k = 0; k < n; ++k) {
+        for (int i = k + 1; i < n; ++i) {
+            mat[i*n + k] /= mat[k*n + k];
+            for (int j = k + 1; j < n; ++j) {
+                mat[i*n + j] -= mat[i*n + k] * mat[k*n + j];
+            }
+        }
+    }
+    return true;
+}

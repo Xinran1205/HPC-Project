@@ -257,6 +257,9 @@ Matrix<T> Matrix<T>:: blockMultiplication(const Matrix<T>& other, int blockSize)
         throw std::invalid_argument("Block size must be positive");
     }
 
+    unsigned int n = std::thread::hardware_concurrency();
+    std::cout << "Number of concurrent threads supported: " << n << std::endl;
+
     Matrix<T> result(m_rows, other.getCols());
     for (size_t i = 0; i < m_rows; i += blockSize) {
         for (size_t j = 0; j < other.getCols(); j += blockSize) {
@@ -284,6 +287,9 @@ Matrix<T> Matrix<T>:: parallelBlockMultiply(const Matrix<T>& other, int blockSiz
     if (blockSize <= 0) {
         throw std::invalid_argument("Block size must be positive");
     }
+
+    unsigned int n = std::thread::hardware_concurrency();
+    std::cout << "Number of concurrent threads supported: " << n << std::endl;
 
     int rows1 = m_rows;
     int cols1 = m_cols;
