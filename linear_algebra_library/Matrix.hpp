@@ -327,11 +327,22 @@ Matrix<T> Matrix<T>::LU_Factorization(int blockLength, int smallBlockSize) const
     if (this->m_rows != this->m_cols) {
         throw std::invalid_argument("Matrix is not square.");
     }
+    if (blockLength <= 0 || smallBlockSize <= 0) {
+        throw std::invalid_argument("Block size must be positive.");
+    }
+    if(!std::is_arithmetic<T>::value) {
+        throw std::invalid_argument("The type of the matrix must be arithmetic.");
+    }
     Matrix<T> result(this->m_rows, this->m_cols, this->m_data);
     std::vector<int> p(result.getRows());
     std::iota(p.begin(), p.end(), 0);
-    // call private function
-    DGETRF_intern(result.m_data, result.getRows(), blockLength, p, smallBlockSize);
+    try {
+        // call private function
+        DGETRF_intern(result.m_data, result.getRows(), blockLength, p, smallBlockSize);
+    } catch (const std::exception& e) {
+        std::cerr << "An error occurred during LU factorization: " << e.what() << std::endl;
+        throw;
+    }
     result.setP(p);
     return result;
 }
@@ -671,7 +682,6 @@ void Matrix<T>:: PDSCAL(std::vector<float>& mat, int n,int blockLength, int k, i
     std::vector<int> indices(numElements);
     std::iota(indices.begin(), indices.end(), k + 1);
     float diagonalElement = mat[k * n + k];
-
     // every thread share the same diagonalElement
     std::for_each(std::execution::par, indices.begin(), indices.end(), [n,k,diagonalElement,&mat](int i) {
         mat[i * n + k] /= diagonalElement;
