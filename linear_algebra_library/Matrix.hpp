@@ -42,7 +42,7 @@ private:
 
     int IDAMAX(const std::vector<T> &mat, int blockLength, int BigDimension, int k, int blockStart) const;
     void SwapParray(std::vector<int>& pMat, int row1, int row2) const;
-    void DGETRF_intern(std::vector<T>& mat, int n, int blockLength, std::vector<int>& pMat, int smallBlockSize) const;
+    void DGETRF_internal(std::vector<T>& mat, int n, int blockLength, std::vector<int>& pMat, int smallBlockSize) const;
 //    void DGEMM(std::vector<T> &mat, int n, int blockStart, int blockLength) const;
     void  BLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength) const;
     void DTRSM_L21(std::vector<T> &mat, int n, int blockStart, int blockLength) const;
@@ -53,7 +53,7 @@ private:
     void DSCAL(std::vector<T> &mat, int n, int blockLength, int k, int blockStart) const;
     void DSWAP(std::vector<T> &mat, int blockStartCol, int endCol, int row1, int row2, int bigDimension) const;
 
-    void PDGETRF_intern(std::vector<float>& mat, int n, int blockLength, std::vector<int>& pMat, int smallBlockSize) const;
+    void PDGETRF_internal(std::vector<float>& mat, int n, int blockLength, std::vector<int>& pMat, int smallBlockSize) const;
     bool PDGETF2(std::vector<float>& mat,std::vector<int>& pMat, int blockLength, int blockStartCol, int bigDimension) const;
     void PBLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength) const;
 //    void PDGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength) const;
@@ -116,14 +116,13 @@ friend Matrix<T> operator*(const Matrix<T>& mat1, const Matrix<T>& mat2) {
     }
 
     Matrix<T> result(mat1.getRows(), mat2.getCols());
-    for (size_t i = 0; i < mat1.getRows(); ++i) {
-        for (size_t j = 0; j < mat2.getCols(); ++j) {
-            for (size_t k = 0; k < mat1.getCols(); ++k) {
+    for (size_t k = 0; k < mat1.getCols(); ++k) {
+        for (size_t i = 0; i < mat1.getRows(); ++i) {
+            for (size_t j = 0; j < mat2.getCols(); ++j) {
                 result(i, j) += mat1(i, k) * mat2(k, j);
             }
         }
     }
-
     return result;
 }
 };
@@ -228,7 +227,7 @@ Matrix<T> Matrix<T>:: transpose() const {
 }
 
 template<typename T>
-Matrix<T> Matrix<T>:: multiplyParallel(const Matrix<T>& other) const {
+Matrix<T> Matrix<T>::multiplyParallel(const Matrix<T>& other) const {
     if (m_cols != other.getRows()) {
         throw std::invalid_argument("Matrix dimensions do not match");
     }
@@ -236,19 +235,20 @@ Matrix<T> Matrix<T>:: multiplyParallel(const Matrix<T>& other) const {
     Matrix<T> result(m_rows, other.getCols());
     std::vector<int> index(m_rows);
     std::iota(index.begin(), index.end(), 0);
-    std::for_each(std::execution::par, index.begin(), index.end(), [&other, this,result](int i) {
-        for (size_t j = 0; j < other.getCols(); ++j) {
-            for (size_t k = 0; k < m_cols; ++k) {
+    //kij
+    for (size_t k=0; k<m_cols; ++k) {
+        std::for_each(std::execution::par, index.begin(), index.end(), [&other, this, &result, k](int i) {
+            for (size_t j = 0; j < other.getCols(); ++j) {
                 result(i, j) += (*this)(i, k) * other(k, j);
             }
-        }
-    });
+        });
+    }
 
     return result;
 }
 
 template<typename T>
-Matrix<T> Matrix<T>:: blockMultiplication(const Matrix<T>& other, int blockSize) const {
+Matrix<T> Matrix<T>::blockMultiplication(const Matrix<T>& other, int blockSize) const {
     if (m_cols != other.getRows()) {
         throw std::invalid_argument("Matrix dimensions do not match");
     }
@@ -257,16 +257,14 @@ Matrix<T> Matrix<T>:: blockMultiplication(const Matrix<T>& other, int blockSize)
         throw std::invalid_argument("Block size must be positive");
     }
 
-    unsigned int n = std::thread::hardware_concurrency();
-    std::cout << "Number of concurrent threads supported: " << n << std::endl;
-
     Matrix<T> result(m_rows, other.getCols());
-    for (size_t i = 0; i < m_rows; i += blockSize) {
-        for (size_t j = 0; j < other.getCols(); j += blockSize) {
-            for (size_t k = 0; k < m_cols; k += blockSize) {
-                for (size_t ii = i; ii < std::min(i + blockSize, m_rows); ++ii) {
-                    for (size_t jj = j; jj < std::min(j + blockSize, other.getCols()); ++jj) {
-                        for (size_t kk = k; kk < std::min(k + blockSize, m_cols); ++kk) {
+    //kij
+    for (size_t k = 0; k < m_cols; k += blockSize) {
+        for (size_t i = 0; i < m_rows; i += blockSize) {
+            for (size_t j = 0; j < other.getCols(); j += blockSize) {
+                for (size_t kk = k; kk < std::min(k + blockSize, m_cols); ++kk) {
+                    for (size_t ii = i; ii < std::min(i + blockSize, m_rows); ++ii) {
+                        for (size_t jj = j; jj < std::min(j + blockSize, other.getCols()); ++jj) {
                             result(ii, jj) += (*this)(ii, kk) * other(kk, jj);
                         }
                     }
@@ -288,9 +286,6 @@ Matrix<T> Matrix<T>:: parallelBlockMultiply(const Matrix<T>& other, int blockSiz
         throw std::invalid_argument("Block size must be positive");
     }
 
-    unsigned int n = std::thread::hardware_concurrency();
-    std::cout << "Number of concurrent threads supported: " << n << std::endl;
-
     int rows1 = m_rows;
     int cols1 = m_cols;
     int cols2 = other.getCols();
@@ -309,9 +304,10 @@ Matrix<T> Matrix<T>:: parallelBlockMultiply(const Matrix<T>& other, int blockSiz
                       int ii = blockPair.first;
                       int jj = blockPair.second;
                       for (int kk = 0; kk < cols1; kk += blockSize) {
-                          for (int i = ii; i < std::min(ii + blockSize, rows1); ++i) {
-                              for (int j = jj; j < std::min(jj + blockSize, cols2); ++j) {
-                                  for (int k = kk; k < std::min(kk + blockSize, cols1); ++k) {
+                          //kij
+                          for (int k = kk; k < std::min(kk + blockSize, cols1); ++k) {
+                              for (int i = ii; i < std::min(ii + blockSize, rows1); ++i) {
+                                  for (int j = jj; j < std::min(jj + blockSize, cols2); ++j) {
                                       product(i, j) += (*this)(i, k) * other(k, j);
                                   }
                               }
@@ -338,7 +334,7 @@ Matrix<T> Matrix<T>::LU_Factorization(int blockLength, int smallBlockSize) const
     std::iota(p.begin(), p.end(), 0);
     try {
         // call private function
-        DGETRF_intern(result.m_data, result.getRows(), blockLength, p, smallBlockSize);
+        DGETRF_internal(result.m_data, result.getRows(), blockLength, p, smallBlockSize);
     } catch (const std::exception& e) {
         std::cerr << "An error occurred during LU factorization: " << e.what() << std::endl;
         throw;
@@ -356,7 +352,7 @@ Matrix<T> Matrix<T>::Parallel_LU_Factorization(int blockLength, int smallBlockSi
     std::vector<int> p(result.getRows());
     std::iota(p.begin(), p.end(), 0);
     // call private function
-    PDGETRF_intern(result.m_data, result.getRows(), blockLength, p, smallBlockSize);
+    PDGETRF_internal(result.m_data, result.getRows(), blockLength, p, smallBlockSize);
     result.setP(p);
     return result;
 }
@@ -510,7 +506,7 @@ void Matrix<T>:: BLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int
 }
 
 template<typename T>
-void Matrix<T>::DGETRF_intern(std::vector<T> &mat, int n, int blockLength, std::vector<int> &pMat, int smallBlockSize) const {
+void Matrix<T>::DGETRF_internal(std::vector<T> &mat, int n, int blockLength, std::vector<int> &pMat, int smallBlockSize) const {
     int blockStart = 0;
     for (; blockStart+blockLength <= n; blockStart+=blockLength) {
 
@@ -541,7 +537,7 @@ void Matrix<T>::DGETRF_intern(std::vector<T> &mat, int n, int blockLength, std::
 }
 
 template<typename T>
-void Matrix<T>::PDGETRF_intern(std::vector<float> &mat, int n, int blockLength, std::vector<int> &pMat, int smallBlockSize) const {
+void Matrix<T>::PDGETRF_internal(std::vector<float> &mat, int n, int blockLength, std::vector<int> &pMat, int smallBlockSize) const {
     int blockStart = 0;
     for (; blockStart+blockLength <= n; blockStart+=blockLength) {
 

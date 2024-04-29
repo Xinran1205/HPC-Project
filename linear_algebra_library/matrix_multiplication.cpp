@@ -2,6 +2,7 @@
 #include <vector>
 #include <chrono>
 #include <random>
+#include <fstream>
 
 //naive matrix multiplication
 
@@ -132,59 +133,58 @@ std::vector<float> generateRandomMatrix(int rows, int cols) {
 }
 
 template<typename Func>
-std::pair<double, double> executeAndMeasure(Func matrixMultiply, const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2) {
+double executeAndMeasure(Func matrixMultiply, const std::vector<float>& mat1, const std::vector<float>& mat2, int rows1, int cols1, int rows2, int cols2) {
     auto start = std::chrono::high_resolution_clock::now();
     matrixMultiply(mat1, mat2, rows1, cols1, rows2, cols2);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
     double seconds = duration.count();
-    double operations = 2.0 * rows1 * cols2 * cols1;
-    double gflops = operations / (seconds * 1e9);
-    return {seconds * 1000, gflops};
+//    double operations = 2.0 * rows1 * cols2 * cols1;
+//    double gflops = operations / (seconds * 1e9);
+    return seconds * 1000;
 }
 
 int main() {
-    std::vector<int> sizes = {100, 200, 300, 400, 500};
+    std::ofstream outFile("IKJKJI_results.txt");
+
+    std::vector<int> sizes = {256,512,1024,2048,3072};
     for (int n : sizes) {
-        //default square matrix
         int row1 = n;
         int cols1 = n;
         int row2 = n;
         int cols2 = n;
         auto mat1 = generateRandomMatrix(n, n);
         auto mat2 = generateRandomMatrix(n, n);
-        // test
-//        int row1 = 2;
-//        int cols1 = 3;
-//        int row2 = 3;
-//        int cols2 = 2;
-//
-//        std::vector<float> mat1 = {1, 2, 3, 4,5,6};
-//        std::vector<float> mat2 = {7, 8, 9, 10, 11, 12};
-//        std::vector<float> ans = {58, 64, 139, 154};
 
-        // Test IJK, IKJ, JIK, JKI, KIJ, KJI and output the performance
-        std::cout << "IJK: " << executeAndMeasure(IJK_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).first << " ms, "
-        << executeAndMeasure(IJK_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).second << " GFLOPS" << std::endl;
+        double operations = 2.0 * row1 * cols2 * cols1;
 
-        std::cout << "IKJ: " << executeAndMeasure(IKJ_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).first << " ms, "
-        << executeAndMeasure(IKJ_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).second << " GFLOPS" << std::endl;
+        auto time1 = executeAndMeasure(IJK_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2);
+        outFile << "IJK: " << time1  << " ms, ";
+        outFile << "GFLOPS: " << operations / (time1 * 1e6) << std::endl;
 
-        std::cout << "JIK: " << executeAndMeasure(JIK_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).first << " ms, "
-        << executeAndMeasure(JIK_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).second << " GFLOPS" << std::endl;
+        auto time2 = executeAndMeasure(IKJ_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2);
+        outFile << "IKJ: " << time2  << " ms, ";
+        outFile << "GFLOPS: " << operations / (time2 * 1e6) << std::endl;
 
-        std::cout << "JKI: " << executeAndMeasure(JKI_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).first << " ms, "
-        << executeAndMeasure(JKI_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).second << " GFLOPS" << std::endl;
+        auto time3 = executeAndMeasure(JIK_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2);
+        outFile << "JIK: " << time3  << " ms, ";
+        outFile << "GFLOPS: " << operations / (time3 * 1e6) << std::endl;
 
-        std::cout << "KIJ: " << executeAndMeasure(KIJ_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).first << " ms, "
-        << executeAndMeasure(KIJ_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).second << " GFLOPS" << std::endl;
+        auto time4 = executeAndMeasure(JKI_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2);
+        outFile << "JKI: " << time4  << " ms, ";
+        outFile << "GFLOPS: " << operations / (time4 * 1e6) << std::endl;
 
-        std::cout << "KJI: " << executeAndMeasure(KJI_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).first << " ms, "
-        << executeAndMeasure(KJI_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2).second << " GFLOPS" << std::endl;
+        auto time5 = executeAndMeasure(KIJ_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2);
+        outFile << "KIJ: " << time5  << " ms, ";
+        outFile << "GFLOPS: " << operations / (time5 * 1e6) << std::endl;
 
+        auto time6 = executeAndMeasure(KJI_matrixMultiply, mat1, mat2,row1,cols1,row2,cols2);
+        outFile << "KJI: " << time6  << " ms, ";
+        outFile << "GFLOPS: " << operations / (time6 * 1e6) << std::endl;
 
-        std::cout << std::endl;
+        outFile << std::endl;
     }
 
+    outFile.close();
     return 0;
 }
