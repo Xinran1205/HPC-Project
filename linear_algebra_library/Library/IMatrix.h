@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <vector>
 #include <chrono>
@@ -30,7 +29,3 @@ public:
 
 #endif //CPP_MATRIX_MULTI_ABSTRACTBASEMATRIX_H
 
-
-
-// = 0：这表示函数是纯虚函数（Pure Virtual Function），用于声明一个接口。在基类中，纯虚函数没有具体的实现，而是要求派生类必须提供实现。
-// 这个概念是用来实现抽象类的，一个包含纯虚函数的类是不能被实例化的，它必须被继承，纯虚函数必须在派生类中被实现。

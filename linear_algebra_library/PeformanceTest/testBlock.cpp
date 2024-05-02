@@ -1,11 +1,14 @@
-#include "Matrix.hpp"
-#include "SparseMatrixCOO.hpp"
-#include "SparseMatrixCSR.hpp"
+#include "../Library/Matrix.hpp"
+#include "../Library/SparseMatrixCOO.hpp"
+#include "../Library/SparseMatrixCSR.hpp"
 #include <iostream>
 #include <vector>
 #include <chrono>
 #include <random>
 #include <fstream>
+
+
+// this file is used to test the performance to find the best block size for block multiplication
 
 std::vector<float> generateRandomMatrix(int rows, int cols) {
     std::vector<float> mat(rows * cols);
@@ -21,15 +24,15 @@ std::vector<float> generateRandomMatrix(int rows, int cols) {
 
 int main() {
     // test correctness of block multiplication
-//    std::vector<int> mat1 = generateRandomMatrix(100, 100);
-//    std::vector<int> mat2 = generateRandomMatrix(100, 100);
-//    Matrix<int> matrix1(100, 100, mat1);
-//    Matrix<int> matrix2(100, 100, mat2);
+//    std::vector<float> mat1 = generateRandomMatrix(100, 100);
+//    std::vector<float> mat2 = generateRandomMatrix(100, 100);
+//    Matrix<float> matrix1(100, 100, mat1);
+//    Matrix<float> matrix2(100, 100, mat2);
 //
-//    Matrix<int> result1 = matrix1 * matrix2;
-//    Matrix<int> result2 = matrix1.blockMultiplication(matrix2, 10);
-//    Matrix<int> result3 = matrix1.multiplyParallel(matrix2);
-//    Matrix<int> result4 = matrix1.parallelBlockMultiply(matrix2, 10);
+//    Matrix<float> result1 = matrix1 * matrix2;
+//    Matrix<float> result2 = matrix1.blockMultiplication(matrix2, 10);
+//    Matrix<float> result3 = matrix1.multiplyParallel(matrix2);
+//    Matrix<float> result4 = matrix1.parallelBlockMultiply(matrix2, 10);
 //
 //    for (int i = 0; i < 100; ++i) {
 //        for (int j = 0; j < 100; ++j) {
@@ -41,23 +44,24 @@ int main() {
 //    }
 //    std::cout << "Correct result" << std::endl;
 
-    // 测试不同块大小的矩阵乘法
-    // 矩阵大小为2048 * 2048
+    // test performance of block multiplication
+    // block size n*n
     std::ofstream outFile("block_size.txt");
-    std::vector<float> mat1 = generateRandomMatrix(2048, 2048);
-    std::vector<float> mat2 = generateRandomMatrix(2048, 2048);
-    Matrix<float> matrix1(2048, 2048, mat1);
-    Matrix<float> matrix2(2048, 2048, mat2);
-    // 测试普通矩阵乘法
+    int n = 1024;
+    std::vector<float> mat1 = generateRandomMatrix(n, n);
+    std::vector<float> mat2 = generateRandomMatrix(n, n);
+    Matrix<float> matrix1(n, n, mat1);
+    Matrix<float> matrix2(n, n, mat2);
+    // test naive multiplication
     auto start = std::chrono::high_resolution_clock::now();
-    Matrix<float> result = matrix1 * matrix2;
+    Matrix<float> result = matrix1*matrix2;
     auto end = std::chrono::high_resolution_clock::now();
     outFile << "Time taken for normal multiplication: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
 
-    for (int block_size = 2; block_size <= 2048; block_size *= 2) {
-        auto start = std::chrono::high_resolution_clock::now();
-        Matrix<float> result = matrix1.blockMultiplication(matrix2, block_size);
-        auto end = std::chrono::high_resolution_clock::now();
+    for (int block_size = 1; block_size <= 1; block_size +=1) {
+        start = std::chrono::high_resolution_clock::now();
+        Matrix<float> result1 = matrix1.blockMultiplication(matrix2, block_size);
+        end = std::chrono::high_resolution_clock::now();
         outFile << "Time taken for block multiplication with block size " << block_size << ": " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
     }
 }

@@ -1,0 +1,22 @@
+size : 1024 LU Factorization: 79 ms
+size : 1024 Eigen LU Factorization: 84 ms
+size : 2024 LU Factorization: 170 ms
+size : 2024 Eigen LU Factorization: 283 ms
+size : 3024 LU Factorization: 488 ms
+size : 3024 Eigen LU Factorization: 837 ms
+size : 4024 LU Factorization: 1096 ms
+size : 4024 Eigen LU Factorization: 1732 ms
+size : 5024 LU Factorization: 2146 ms
+size : 5024 Eigen LU Factorization: 3116 ms
+size : 6024 LU Factorization: 4556 ms
+size : 6024 Eigen LU Factorization: 5150 ms
+size : 7024 LU Factorization: 7167 ms
+size : 7024 Eigen LU Factorization: 8653 ms
+size : 8024 LU Factorization: 9974 ms
+size : 8024 Eigen LU Factorization: 11355 ms
+size : 9024 LU Factorization: 13727 ms
+size : 9024 Eigen LU Factorization: 15559 ms
+size : 10024 LU Factorization: 18301 ms
+size : 10024 Eigen LU Factorization: 21583 ms
+size : 11024 LU Factorization: 24673 ms
+size : 11024 Eigen LU Factorization: 28755 ms

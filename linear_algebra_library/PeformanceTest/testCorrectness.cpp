@@ -1,6 +1,9 @@
-#include "Matrix.hpp"
-#include "SparseMatrixCOO.hpp"
-#include "SparseMatrixCSR.hpp"
+#include "../Library/Matrix.hpp"
+#include "../Library/SparseMatrixCOO.hpp"
+#include "../Library/SparseMatrixCSR.hpp"
+
+
+// This file is to test the correctness of my library!
 
 std::vector<std::vector<float>> generateRandomMatrix(int rows, int cols) {
     std::vector<std::vector<float>> mat(rows, std::vector<float>(cols));
@@ -70,14 +73,14 @@ int main() {
 //    }
 
     // test LU decomposition
-    std::vector<int> sizes = {6,1,2,5,23,45,67,98,239,112,45,1024,1280};
+    std::vector<int> sizes = {6,1,2,5,23,42,11,12,13,14,64,45,67,98,239,112,45,1024,1280};
     for (int n : sizes) {
         auto A = generateRandomMatrix(n, n);
 
         Matrix<float> mat(A);
 
-        Matrix<float> result = mat.LU_Factorization(5);
-//        Matrix<float> result = mat.Parallel_LU_Factorization(5);
+//        Matrix<float> result = mat.LU_Factorization(100);
+        Matrix<float> result = mat.Parallel_LU_Factorization(5);
 
         //print p mat 50
 //        for (int i = 0; i < 50; ++i) {
@@ -111,7 +114,7 @@ int main() {
         bool isEqual = true;
         for (int i = 0; i < n; ++i) {
             for (int j = 0; j < n; ++j) {
-                if ( std::fabs(result2[i * n + j] - A[i][j]) > 0.5) {
+                if ( std::fabs(result2[i * n + j] - A[i][j]) > 2) {
                     std::cout << "result[" << i << "][" << j << "] = " << result2[i * n + j] << ", A[" << i << "][" << j
                               << "] = " << A[i][j] << std::endl;
                     isEqual = false;

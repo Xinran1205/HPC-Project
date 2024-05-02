@@ -258,14 +258,18 @@ Matrix<T> Matrix<T>::blockMultiplication(const Matrix<T>& other, int blockSize) 
     }
 
     Matrix<T> result(m_rows, other.getCols());
-    //kij
-    for (size_t k = 0; k < m_cols; k += blockSize) {
-        for (size_t i = 0; i < m_rows; i += blockSize) {
+
+    for (size_t i = 0; i < m_rows; i += blockSize) {
+        size_t i_max = std::min(i + blockSize, m_rows);
+        for (size_t k = 0; k < m_cols; k += blockSize) {
+            size_t k_max = std::min(k + blockSize, m_cols);
             for (size_t j = 0; j < other.getCols(); j += blockSize) {
-                for (size_t kk = k; kk < std::min(k + blockSize, m_cols); ++kk) {
-                    for (size_t ii = i; ii < std::min(i + blockSize, m_rows); ++ii) {
-                        for (size_t jj = j; jj < std::min(j + blockSize, other.getCols()); ++jj) {
-                            result(ii, jj) += (*this)(ii, kk) * other(kk, jj);
+                size_t j_max = std::min(j + blockSize, other.getCols());
+                for (size_t ii = i; ii < i_max; ++ii) {
+                    for (size_t kk = k; kk < k_max; ++kk) {
+                        T r = (*this)(ii, kk);
+                        for (size_t jj = j; jj < j_max; ++jj) {
+                            result(ii, jj) += r * other(kk, jj);
                         }
                     }
                 }
@@ -303,12 +307,16 @@ Matrix<T> Matrix<T>:: parallelBlockMultiply(const Matrix<T>& other, int blockSiz
                   [this, rows1, cols1, cols2, blockSize, &other, &product](const std::pair<int, int>& blockPair) {
                       int ii = blockPair.first;
                       int jj = blockPair.second;
+                      int min_ii = std::min(ii + blockSize, rows1);
+                      int min_jj = std::min(jj + blockSize, cols2);
                       for (int kk = 0; kk < cols1; kk += blockSize) {
                           //kij
-                          for (int k = kk; k < std::min(kk + blockSize, cols1); ++k) {
-                              for (int i = ii; i < std::min(ii + blockSize, rows1); ++i) {
-                                  for (int j = jj; j < std::min(jj + blockSize, cols2); ++j) {
-                                      product(i, j) += (*this)(i, k) * other(k, j);
+                          int min_kk = std::min(kk + blockSize, cols1);
+                          for (int k = kk; k < min_kk; ++k) {
+                              for (int i = ii; i < min_ii; ++i) {
+                                  T r = (*this)(i, k);
+                                  for (int j = jj; j < min_jj; ++j) {
+                                      product(i, j) += r * other(k, j);
                                   }
                               }
                           }
@@ -485,25 +493,48 @@ void Matrix<T>:: DTRSM_L21(std::vector<T>& mat, int n, int blockStart, int block
 }
 
 template<typename T>
-void Matrix<T>:: BLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength) const {
-    // can assume that smallBlockLength is equal to blockLength, which may be tested later
+void Matrix<T>::BLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength) const {
     int A22start = blockStart + blockLength;
-    for (int ii = A22start; ii < n; ii += smallBlockLength) {
-        for (int jj = A22start; jj < n; jj += smallBlockLength) {
-            for (int kk = blockStart; kk < A22start; kk += smallBlockLength) {
-                for (int i = ii; i < std::min(ii + smallBlockLength, n); ++i) {
-                    for (int j = jj; j < std::min(jj + smallBlockLength, n); ++j) {
-                        float sum = 0.0;
-                        for (int k = kk; k < std::min(kk + smallBlockLength, A22start); ++k) {
-                            sum += mat[i * n + k] * mat[k * n + j];
+
+    for (int kk = blockStart; kk < A22start; kk += smallBlockLength) {
+        int kk_max = std::min(kk + smallBlockLength, A22start);
+        for (int ii = A22start; ii < n; ii += smallBlockLength) {
+            int ii_max = std::min(ii + smallBlockLength, n);
+            for (int jj = A22start; jj < n; jj += smallBlockLength) {
+                int jj_max = std::min(jj + smallBlockLength, n);
+                for (int i = ii; i < ii_max; ++i) {
+                    for (int k = kk; k < kk_max; ++k) {
+                        float r = mat[i * n + k];
+                        for (int j = jj; j < jj_max; ++j) {
+                            mat[i * n + j] -= r * mat[k * n + j];
                         }
-                        mat[i * n + j] -= sum;
                     }
                 }
             }
         }
     }
 }
+
+//template<typename T>
+//void Matrix<T>:: BLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength) const {
+//    // can assume that smallBlockLength is equal to blockLength, which may be tested later
+//    int A22start = blockStart + blockLength;
+//    for (int ii = A22start; ii < n; ii += smallBlockLength) {
+//        for (int jj = A22start; jj < n; jj += smallBlockLength) {
+//            for (int kk = blockStart; kk < A22start; kk += smallBlockLength) {
+//                for (int i = ii; i < std::min(ii + smallBlockLength, n); ++i) {
+//                    for (int j = jj; j < std::min(jj + smallBlockLength, n); ++j) {
+//                        float sum = 0.0;
+//                        for (int k = kk; k < std::min(kk + smallBlockLength, A22start); ++k) {
+//                            sum += mat[i * n + k] * mat[k * n + j];
+//                        }
+//                        mat[i * n + j] -= sum;
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
 
 template<typename T>
 void Matrix<T>::DGETRF_internal(std::vector<T> &mat, int n, int blockLength, std::vector<int> &pMat, int smallBlockSize) const {
@@ -622,6 +653,7 @@ void Matrix<T>:: PDTRSM_L21(std::vector<float>& mat, int n, int blockStart, int 
 //    });
 //}
 
+// DGEMM to update A22 using block algorithm
 template<typename T>
 void Matrix<T>:: PBLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, int blockLength, int smallBlockLength) const {
     // can assume that smallBlockLength is equal to blockLength, which may be tested later
@@ -640,14 +672,16 @@ void Matrix<T>:: PBLOCK_DGEMM(std::vector<float>& mat, int n, int blockStart, in
                   [blockStart,A22start,smallBlockLength,n,&mat](const std::pair<int, int>& block) {
                       int ii = block.first;
                       int jj = block.second;
+                      int min_ii = std::min(ii + smallBlockLength, n);
+                      int min_jj = std::min(jj + smallBlockLength, n);
                       for (int kk = blockStart; kk < A22start; kk += smallBlockLength) {
-                          for (int i = ii; i < std::min(ii + smallBlockLength, n); ++i) {
-                              for (int j = jj; j < std::min(jj + smallBlockLength, n); ++j) {
-                                  float sum = 0.0;
-                                  for (int k = kk; k < std::min(kk + smallBlockLength, A22start); ++k) {
-                                      sum += mat[i * n + k] * mat[k * n + j];
+                          int min_kk = std::min(kk + smallBlockLength, A22start);
+                          for (int i = ii; i < min_ii; ++i) {
+                              for (int k = kk; k < min_kk; ++k) {
+                                  float r = mat[i * n + k];
+                                  for (int j = jj; j < min_jj; ++j) {
+                                      mat[i * n + j] -= r * mat[k * n + j];
                                   }
-                                  mat[i * n + j] -= sum;
                               }
                           }
                       }

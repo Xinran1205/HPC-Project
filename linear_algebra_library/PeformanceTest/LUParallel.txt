@@ -1,0 +1,10 @@
+size : 1024 serial : 133 ms
+size : 1024 parallel : 90 ms
+size : 2048 serial : 892 ms
+size : 2048 parallel : 383 ms
+size : 4096 serial : 5395 ms
+size : 4096 parallel : 2050 ms
+size : 8192 serial : 46278 ms
+size : 8192 parallel : 16522 ms
+size : 16384 serial : 320106 ms
+size : 16384 parallel : 123758 ms

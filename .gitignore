@@ -2,6 +2,8 @@
 **/out/
 **/.vscode/
 **/cmake-build-debug/
+**/.exe/
+**/.txt/
 *.dat
 
 # Prerequisites

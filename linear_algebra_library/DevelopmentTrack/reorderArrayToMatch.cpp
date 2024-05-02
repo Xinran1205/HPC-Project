@@ -1,6 +1,11 @@
 #include <iostream>
 #include <vector>
 
+
+// This file is testing the correctness of the reorderArrayToMatch function
+
+// This function idea is used in the LU factorization DLASWP function!
+
 // give a vector A and a vector B, reorder A to match B
 
 // exercise function for LU decomposition Swapping function

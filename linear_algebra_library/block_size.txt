@@ -1,2 +1,0 @@
-Time taken for normal multiplication: 84050 ms
-Time taken for block multiplication with block size 2: 85735 ms

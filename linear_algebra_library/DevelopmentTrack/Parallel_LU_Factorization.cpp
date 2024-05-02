@@ -7,10 +7,10 @@
 #include <iomanip>
 #include <thread>
 
+
 // Find the row with the maximum value in the column, starting from the k downwards.
 // not easy to parallel,
 // my idea is to divide this column into chunks and parallel find the max value in each chunk and then find the max value in the max values
-
 int IDAMAX(const std::vector<float>& mat, int blockLength, int BigDimension, int k, int blockStart) {
     int pivotRow = k;
     float maxVal = std::fabs(mat[k*BigDimension+k]);

@@ -1,6 +1,13 @@
-#include "Matrix.hpp"
-#include "SparseMatrixCOO.hpp"
-#include "SparseMatrixCSR.hpp"
+#include "Library/Matrix.hpp"
+#include "Library/SparseMatrixCOO.hpp"
+#include "Library/SparseMatrixCSR.hpp"
+
+// this file gives an example of how to use my linear algebra library
+
+// To use the library:
+// 1. download the library from my github repository
+// 2. include the header files
+// 3. use as shown below
 
 int main() {
 
